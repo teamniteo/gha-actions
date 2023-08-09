@@ -14,10 +14,10 @@ runs:
     using: 'composite'
     steps:
       - name: Check that Base path is not Empty
-        if: ${{ inputs.base == '')}}
+        if: ${{ inputs.base == ''}}
         shell: bash
         run: |
-          echo "::error title=🔴 error hint::Base path empty, you need to speecify it to run the check."
+          echo "::error title=🔴 error hint::Base path empty, you need to specify it to run the check."
           exit 1
       
       - name: Checking consistency between alembic revision and models
@@ -30,9 +30,9 @@ runs:
 
           # This works by running `alembic autogenerate` to generate a new
           # migration step, then verifying that it is "empty" by counting
-          # how many "pass" words are in it.
+          # How many "pass" words are in it.
           PRESENT_PASS_COUNT=$(grep -ic pass $BASE/*_test_consistency.py)
-          if [ $PRESENT_PASS_COUNT != 2 ]; then
+          if [ $PRESENT_PASS_COUNT != 2 ]; ?
             echo "::error title=🔴 error hint::You probably forgot to generate and commit a DB migration ..."
             cat "$BASE/*_test_consistency.py" >> $GITHUB_STEP_SUMMARY
             exit 1
