@@ -17,7 +17,7 @@ runs:
         if: ${{ inputs.base == ''}}
         shell: bash
         run: |
-          echo "::error title=🔴 error hint::Base path empty, you need to specify it to run the check."
+          echo "::error title=🔴 Check for Alembic Migration::Base path empty, you need to specify it to run the check."
           exit 1
       
       - name: Checking consistency between alembic revision and models
@@ -35,10 +35,10 @@ runs:
           # How many "pass" words are in it.
           PRESENT_PASS_COUNT=$(grep -ic pass $BASE/*_test_consistency.py)
           if [ $PRESENT_PASS_COUNT != 2 ]; then
-            echo "::error title=🔴::You probably forgot to generate and commit a DB migration ..."
+            echo "::error title=🔴 Check for Alembic Migration::You probably forgot to generate and commit a DB migration ..."
             cat "$BASE/*_test_consistency.py" >> $GITHUB_STEP_SUMMARY
             exit 1
           else
-            echo "::notice title=🟢::Consistency between alembic revision and models is OK"
+            echo "::notice title=🟢 Check for Alembic Migration::Consistency between alembic revision and models is OK"
           fi
           rm -f $BASE/*_test_consistency.py
