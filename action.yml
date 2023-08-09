@@ -34,7 +34,7 @@ runs:
           # migration step, then verifying that it is "empty" by counting
           # How many "pass" words are in it.
           PRESENT_PASS_COUNT=$(grep -ic pass $BASE/*_test_consistency.py)
-          if [ $PRESENT_PASS_COUNT != 2 ]; ?
+          if [ $PRESENT_PASS_COUNT != 2 ]; then
             echo "::error title=🔴 error hint::You probably forgot to generate and commit a DB migration ..."
             cat "$BASE/*_test_consistency.py" >> $GITHUB_STEP_SUMMARY
             exit 1
