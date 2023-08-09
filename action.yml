@@ -1,8 +1,8 @@
 # Copyright (c) Niteo & AUTHORS
 # SPDX-License-Identifier: BSD-3-Clause
 #
-name: 'Connect Tailscale'
-description: 'Connect your GitHub Action workflow to Tailscale'
+name: 'Check for Alembic Migrations'
+description: 'Checking consistency between alembic revision and models'
 branding:
   icon: 'arrow-right-circle'
   color: 'gray-dark'
@@ -17,7 +17,7 @@ runs:
         if: ${{ inputs.base == '')}}
         shell: bash
         run: |
-          echo "::error title=⛔ error hint::Base path empty, you need to speecify it to run the check."
+          echo "::error title=🔴 error hint::Base path empty, you need to speecify it to run the check."
           exit 1
       
       - name: Checking consistency between alembic revision and models
@@ -33,10 +33,10 @@ runs:
           # how many "pass" words are in it.
           PRESENT_PASS_COUNT=$(grep -ic pass $BASE/*_test_consistency.py)
           if [ $PRESENT_PASS_COUNT != 2 ]; then
-            echo "You probably forgot to generate and commit a DB migration ..." >> $GITHUB_STEP_SUMMARY
+            echo "::error title=🔴 error hint::You probably forgot to generate and commit a DB migration ..."
             cat "$BASE/*_test_consistency.py" >> $GITHUB_STEP_SUMMARY
             exit 1
           else
-            echo "Consistency between alembic revision and models is OK" >> $GITHUB_STEP_SUMMARY
+            echo "::notice title=🟢 hint::Consistency between alembic revision and models is OK" >> $GITHUB_STEP_SUMMARY
           fi
           rm -f $BASE/*_test_consistency.py
