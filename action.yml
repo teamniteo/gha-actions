@@ -21,6 +21,7 @@ runs:
           exit 1
       
       - name: Checking consistency between alembic revision and models
+        shell: bash
         env:
           BASE: ${{ inputs.base }}
         run: |
