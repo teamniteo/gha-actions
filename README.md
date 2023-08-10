@@ -21,6 +21,22 @@ This GitHub Action sets nix for use in CI.
       cachix_auth_token: '${{ secrets.CACHIX_AUTH_TOKEN }}'
 ```
 
+By default, this action assumes that:
+* You are using the `niteo` cachix cache.
+* You have `./nix/default.nix` in your repo where nix can find nixpkgs.
+
+You can set your project specific values like so:
+
+```yaml
+  - name: Configure nix
+    uses: teamniteo/gha-actions/nix@main
+    with:
+      cachix_auth_token: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+      cache: myproject
+      nix_path: nixpkgs=nixos-unstable
+```
+
+
 # Uncommited changes Action
 
 This GitHub Action checks if there are uncommited or not ignored files present after the steps ran.
