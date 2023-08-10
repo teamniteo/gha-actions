@@ -19,7 +19,7 @@ runs:
     - uses: cachix/cachix-action@v12
       with:
         name: ${{ inputs.cache }}
-        authToken: ${{ inputs.cachix_auth_token }}
+        authToken: ${{ inputs.auth_token }}
 
     - name: Build nix-shell
       shell: bash
