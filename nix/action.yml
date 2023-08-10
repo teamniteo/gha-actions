@@ -17,7 +17,7 @@ runs:
         nix_path: nixpkgs=channel:nixos-unstable
     - uses: cachix/cachix-action@v12
       with:
-        name: inputs.cachix_auth_token || 'niteo'
+        cache: inputs.cachix_auth_token || 'niteo'
         authToken: inputs.cachix_auth_token
 
     - name: Build nix-shell
