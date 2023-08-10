@@ -4,8 +4,10 @@ description:
   derivations to cache
 
 inputs:
-  cachix_auth_token:
+  auth_token:
     required: true
+  name:
+    required: false
 
 runs:
   using: "composite"
@@ -15,8 +17,8 @@ runs:
         nix_path: nixpkgs=channel:nixos-unstable
     - uses: cachix/cachix-action@v12
       with:
-        name: niteo
-        authToken: '${{ inputs.cachix_auth_token }}'
+        name: inputs.cachix_auth_token || 'niteo'
+        authToken: inputs.cachix_auth_token
 
     - name: Build nix-shell
       shell: bash
