@@ -18,8 +18,8 @@ runs:
         nix_path: nixpkgs=channel:nixos-unstable
     - uses: cachix/cachix-action@v12
       with:
-        name: inputs.cache
-        authToken: inputs.cachix_auth_token
+        name: ${{ inputs.cache }}
+        authToken: ${{ inputs.cachix_auth_token }}
 
     - name: Build nix-shell
       shell: bash
