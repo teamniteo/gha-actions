@@ -10,8 +10,6 @@ inputs:
     default: niteo
   nix_path:
     default: nixpkgs=./nix/default.nix
-  pushFilter:
-    default: ""
   
 runs:
   using: "composite"
@@ -24,7 +22,7 @@ runs:
       with:
         name: ${{ inputs.cache }}
         authToken: ${{ inputs.auth_token }}
-        pushFilter: ${{ inputs.pushFilter }}
+        pushFilter: '(-source$|nixpkgs\.tar\.gz$)'
 
     - name: Build nix-shell
       shell: bash
