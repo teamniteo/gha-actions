@@ -31,7 +31,7 @@ You can set your project specific values like so:
   - name: Configure nix
     uses: teamniteo/gha-actions/nix@main
     with:
-      cachix_auth_token: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+      auth_token: '${{ secrets.CACHIX_AUTH_TOKEN }}'
       cache: myproject
       nix_path: nixpkgs=nixos-unstable
 ```
