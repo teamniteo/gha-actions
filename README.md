@@ -18,7 +18,7 @@ This GitHub Action sets nix for use in CI.
   - name: Configure nix
     uses: teamniteo/gha-actions/nix@main
     with:
-      cachix_auth_token: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+      auth_token: '${{ secrets.CACHIX_AUTH_TOKEN }}'
 ```
 
 By default, this action assumes that:
