@@ -2,11 +2,17 @@ name: "Uncommitted Changes"
 description:
   Fail if any uncommitted changes are detected.
 
+inputs:
+  files:
+    default: 
+
 runs:
   using: "composite"
   steps:
     - uses: tj-actions/verify-changed-files@v14
       id: verify-changed-files
+      with:
+          files: ${{ inputs.exclude }}
 
     - name: List all changed files tracked and untracked files
       if: steps.verify-changed-files.outputs.files_changed == 'true'
