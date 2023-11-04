@@ -46,7 +46,7 @@ This GitHub Action checks if there are uncommited or not ignored files present a
     uses: teamniteo/gha-actions/uncommitted-changes@main
 ```
 
-You can include some files like so:
+You can exclude some files like so:
 
 ```yaml
         with:
