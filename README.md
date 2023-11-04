@@ -45,3 +45,19 @@ This GitHub Action checks if there are uncommited or not ignored files present a
   - name: Check for uncommitted-changes
     uses: teamniteo/gha-actions/uncommitted-changes@main
 ```
+
+You can exclude some files like so:
+
+```yaml
+        with:
+            files: "!graphs/*.png"
+```
+
+Or multiple files likes:
+
+```
+        with:
+            files: |
+              !graphs/*.png
+              !mockups/*.bmpr
+```
