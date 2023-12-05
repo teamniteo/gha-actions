@@ -24,6 +24,7 @@ This GitHub Action sets nix for use in CI.
 By default, this action assumes that:
 * You are using the `niteo` cachix cache.
 * You have `./nix/default.nix` in your repo where nix can find nixpkgs.
+* You are using Namespace.so runners.
 
 You can set your project specific values like so:
 
@@ -34,6 +35,8 @@ You can set your project specific values like so:
       auth_token: '${{ secrets.CACHIX_AUTH_TOKEN }}'
       cache: myproject
       nix_path: nixpkgs=nixos-unstable
+      push_filter: (-source$|nixpkgs\.tar\.gz$)
+      namespace_runner: false
 ```
 
 

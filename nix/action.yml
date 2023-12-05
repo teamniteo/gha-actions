@@ -12,10 +12,25 @@ inputs:
     default: nixpkgs=./nix/default.nix
   push_filter:
     default: 
+  namespace_runner:
+    default: true
     
 runs:
   using: "composite"
   steps:
+
+    - name: namespacelabs/nscloud-cache-action cannot mkdir /nix so we do it manually
+      if: ${{ inputs.namespace_runner == 'true' }}
+      shell: bash
+      run: |
+        sudo mkdir /nix
+        sudo chown $USER /nix
+
+    - uses: namespacelabs/nscloud-cache-action@v1
+      if: ${{ inputs.namespace_runner == 'true' }}
+      with:
+        path: /nix
+
     - uses: cachix/install-nix-action@v22
       with:
         nix_path: ${{ inputs.nix_path }}
