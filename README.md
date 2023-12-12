@@ -12,7 +12,8 @@ by adding a step to your workflow.
 
 # NIX-Shell Action
 
-This GitHub Action sets nix for use in CI.
+This GitHub Action sets nix for use in CI. It supports GitHub Managed Runners
+and Namespace.so Runners. 
 
 ```yaml
   - name: Configure nix
@@ -24,7 +25,6 @@ This GitHub Action sets nix for use in CI.
 By default, this action assumes that:
 * You are using the `niteo` cachix cache.
 * You have `./nix/default.nix` in your repo where nix can find nixpkgs.
-* You are using Namespace.so runners.
 
 You can set your project specific values like so:
 
