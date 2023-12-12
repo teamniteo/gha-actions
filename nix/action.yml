@@ -29,7 +29,7 @@ runs:
       with:
         path: /nix
 
-    - uses: cachix/install-nix-action@v22
+    - uses: cachix/install-nix-action@v24
       with:
         nix_path: ${{ inputs.nix_path }}
         
