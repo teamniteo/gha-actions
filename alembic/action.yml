@@ -26,7 +26,7 @@ runs:
           BASE: ${{ inputs.base }}
         run: |
           cd backend
-          ALEMBIC="alembic -c etc/alembic.ini -x ini=etc/test.ini"
+          ALEMBIC="alembic -c etc/test.ini"
           nix-shell --run "$ALEMBIC upgrade head"
           nix-shell --run "$ALEMBIC revision --autogenerate -m 'Test Consistency'"
 
