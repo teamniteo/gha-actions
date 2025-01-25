@@ -1,0 +1,31 @@
+name: 'AI review of Pull Requests'
+description: 'Use OpenAI to review Pull Requests'
+
+runs:
+    using: 'composite'
+    steps:      
+
+    - name: Run OpenAI code review
+      id: openai
+      run: python ${{ github.action_path }}/review.py
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+        COMMIT_TITLE: ${{ github.event.pull_request.title }}
+        COMMIT_BODY: ${{ github.event.pull_request.body }}
+
+    - name: Find Comment
+      uses: peter-evans/find-comment@v3
+      id: fc
+      with:
+        issue-number: ${{ github.event.pull_request.number }}
+        comment-author: 'github-actions[bot]'
+        body-includes: AI Code Review
+
+    - name: Create or update comment
+      uses: peter-evans/create-or-update-comment@v4
+      with:
+        issue-number: ${{ github.event.pull_request.number }}
+        comment-id: ${{ steps.fc.outputs.comment-id }}
+        edit-mode: replace
+        body-path: review.txt

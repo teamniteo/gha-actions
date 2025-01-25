@@ -64,3 +64,22 @@ Or multiple files likes:
               !graphs/*.png
               !mockups/*.bmpr
 ```
+
+# AI PR Review Action
+
+This GitHub Action uses OpenAI to do a review of a PR.
+
+```yaml
+
+on: [pull_request]
+
+jobs:
+  code-review:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: teamniteo/gha-actions@v12
+```
