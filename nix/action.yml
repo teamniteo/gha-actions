@@ -11,8 +11,8 @@ inputs:
   nix_path:
     default: nixpkgs=./nix/default.nix
   push_filter:
-    default: 
-    
+    default:
+
 runs:
   using: "composite"
   steps:
@@ -23,7 +23,7 @@ runs:
         if [ -n "$NSC_PROFILE_TAG" ]; then
           echo "NAMESPACE_RUNNER=1" >> $GITHUB_ENV
         fi
-        
+
     - name: namespacelabs/nscloud-cache-action cannot mkdir /nix so we do it manually
       if: env.NAMESPACE_RUNNER
       shell: bash
@@ -31,16 +31,18 @@ runs:
         sudo mkdir /nix
         sudo chown $USER /nix
 
-    - uses: namespacelabs/nscloud-cache-action@v1
+    - uses: namespacelabs/nscloud-cache-action@v1.2.13
       if: env.NAMESPACE_RUNNER
       with:
         path: /nix
 
-    - uses: cachix/install-nix-action@v24
+    - uses: cachix/install-nix-action@v27
       with:
         nix_path: ${{ inputs.nix_path }}
-        
-    - uses: cachix/cachix-action@v12
+        extra_nix_config: |
+          system-features = kvm nixos-test
+
+    - uses: cachix/cachix-action@v16
       with:
         name: ${{ inputs.cache }}
         authToken: ${{ inputs.auth_token }}
