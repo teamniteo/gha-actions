@@ -51,3 +51,15 @@ runs:
     - name: Build nix-shell
       shell: bash
       run: nix-shell --run "echo 'nix-shell successfully entered'"
+
+    - name: Enable KVM on namespace.so
+      if: env.NAMESPACE_RUNNER
+      run: |
+        sudo chmod 666 /dev/kvm
+        echo "=== KVM Device Status ==="
+        ls -la /dev/kvm || echo "/dev/kvm not found"
+        [ -r /dev/kvm ] && [ -w /dev/kvm ] && echo "KVM is accessible" || echo "KVM is NOT accessible"
+        echo ""
+        echo "=== CPU Virtualization Support ==="
+        grep -E 'vmx|svm' /proc/cpuinfo | head -1 | grep -oE 'vmx|svm' && echo "CPU supports virtualization" || echo "CPU does NOT support virtualization"
+
