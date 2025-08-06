@@ -54,6 +54,7 @@ runs:
 
     - name: Enable KVM on namespace.so
       if: env.NAMESPACE_RUNNER
+      shell: bash
       run: |
         sudo chmod 666 /dev/kvm
         echo "=== KVM Device Status ==="
