@@ -48,10 +48,6 @@ runs:
         authToken: ${{ inputs.auth_token }}
         pushFilter: ${{ inputs.push_filter }}
 
-    - name: Build nix-shell
-      shell: bash
-      run: nix-shell --run "echo 'nix-shell successfully entered'"
-
     - name: Enable KVM on namespace.so
       if: env.NAMESPACE_RUNNER
       shell: bash
@@ -63,4 +59,8 @@ runs:
         echo ""
         echo "=== CPU Virtualization Support ==="
         grep -E 'vmx|svm' /proc/cpuinfo | head -1 | grep -oE 'vmx|svm' && echo "CPU supports virtualization" || echo "CPU does NOT support virtualization"
+
+    - name: Build nix-shell
+      shell: bash
+      run: nix-shell --run "echo 'nix-shell successfully entered'"
 
