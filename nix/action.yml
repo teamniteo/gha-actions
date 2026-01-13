@@ -70,6 +70,8 @@ runs:
     - name: Build nix-shell
       shell: bash
       run: |
+        echo "a"
         echo $ELM_HOME
+        echo "b"
         nix-shell --run "echo 'nix-shell successfully entered'"
 
