@@ -60,19 +60,8 @@ runs:
         echo ""
         echo "=== CPU Virtualization Support ==="
         grep -E 'vmx|svm' /proc/cpuinfo | head -1 | grep -oE 'vmx|svm' && echo "CPU supports virtualization" || echo "CPU does NOT support virtualization"
-
-    - name: Cache ELM_HOME
-      if: env.NAMESPACE_RUNNER
-      shell: bash
-      run: |
-        mkdir -p /nix/elm
-        echo "ELM_HOME=/nix/elm" >> $GITHUB_ENV
         
     - name: Build nix-shell
       shell: bash
-      run: |
-        echo "a"
-        echo $ELM_HOME
-        echo "b"
-        nix-shell --run "echo 'nix-shell successfully entered'"
+      run: nix-shell --run "echo 'nix-shell successfully entered'"
 
