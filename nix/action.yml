@@ -35,6 +35,7 @@ runs:
       if: env.NAMESPACE_RUNNER
       with:
         path: /nix
+        path: ~/.elm
 
     - uses: cachix/install-nix-action@v27
       with:
