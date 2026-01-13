@@ -64,7 +64,7 @@ runs:
       if: env.NAMESPACE_RUNNER
       shell: bash
       run: |
-        mkdir /nix/elm
+        mkdir -p /nix/elm
         echo "ELM_HOME=/nix/elm" >> $GITHUB_ENV
         
     - name: Build nix-shell
