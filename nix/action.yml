@@ -34,7 +34,9 @@ runs:
     - uses: namespacelabs/nscloud-cache-action@v1.2.13
       if: env.NAMESPACE_RUNNER
       with:
-        path: /nix
+        path: |
+          /nix
+          ~/.elm
 
     - uses: cachix/install-nix-action@v27
       with:
