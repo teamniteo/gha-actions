@@ -12,6 +12,10 @@ inputs:
     default: nixpkgs=./nix/default.nix
   push_filter:
     default:
+  niteo_claude_deploy_key:
+    description: "Allow nix to fetch the teamniteo/claude private repo"
+    required: false
+    default: ""
 
 runs:
   using: "composite"
@@ -62,6 +66,12 @@ runs:
         echo "=== CPU Virtualization Support ==="
         grep -E 'vmx|svm' /proc/cpuinfo | head -1 | grep -oE 'vmx|svm' && echo "CPU supports virtualization" || echo "CPU does NOT support virtualization"
 
+    - name: Allow nix to fetch the teamniteo/claude private repo
+      if: ${{ inputs.niteo_claude_deploy_key != '' }}
+      uses: webfactory/ssh-agent@v0.9.1
+      with:
+        ssh-private-key: ${{ inputs.niteo_claude_deploy_key }}
+        
     - name: Build nix-shell
       shell: bash
       run: nix-shell --run "echo 'nix-shell successfully entered'"
