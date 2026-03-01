@@ -32,8 +32,9 @@ runs:
 
           # This works by running `alembic autogenerate` to generate a new
           # migration step, then verifying that it is "empty" by counting
-          # How many "pass" words are in it.
-          PRESENT_PASS_COUNT=$(grep -ic pass $BASE/*_test_consistency.py)
+          # how many Python `pass` statements are in it. An empty migration
+          # has exactly 2: one in upgrade() and one in downgrade().
+          PRESENT_PASS_COUNT=$(grep -cE '^\s+pass$' $BASE/*_test_consistency.py)
           if [ $PRESENT_PASS_COUNT != 2 ]; then
             echo "::error title=🔴 Check for Alembic Migration::You probably forgot to generate and commit a DB migration ..."
             cat "$BASE/*_test_consistency.py" >> $GITHUB_STEP_SUMMARY
