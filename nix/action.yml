@@ -21,11 +21,14 @@ runs:
   using: "composite"
   steps:
 
-    - name: Figure out if we are running in a Namespace.so runner or not
+    - name: Figure out what kind of runner we are on
       shell: bash
       run: |
         if [ -n "$NSC_PROFILE_TAG" ]; then
           echo "NAMESPACE_RUNNER=1" >> $GITHUB_ENV
+        fi
+        if [ -d /run/current-system ]; then
+          echo "NIXOS_RUNNER=1" >> $GITHUB_ENV
         fi
 
     - name: namespacelabs/nscloud-cache-action cannot mkdir /nix so we do it manually
@@ -43,16 +46,23 @@ runs:
           ~/.elm
 
     - uses: cachix/install-nix-action@v27
+      if: ${{ !env.NIXOS_RUNNER }}
       with:
         nix_path: ${{ inputs.nix_path }}
         extra_nix_config: |
           system-features = kvm nixos-test
+
+    - name: Set NIX_PATH on NixOS runners
+      if: env.NIXOS_RUNNER
+      shell: bash
+      run: echo "NIX_PATH=${{ inputs.nix_path }}" >> $GITHUB_ENV
 
     - uses: cachix/cachix-action@v16
       with:
         name: ${{ inputs.cache }}
         authToken: ${{ inputs.auth_token }}
         pushFilter: ${{ inputs.push_filter }}
+        skipAddingSubstituter: ${{ env.NIXOS_RUNNER == '1' }}
 
     - name: Enable KVM on namespace.so
       if: env.NAMESPACE_RUNNER
