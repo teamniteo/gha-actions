@@ -59,6 +59,7 @@ runs:
         authToken: ${{ inputs.auth_token }}
         pushFilter: ${{ inputs.push_filter }}
         skipAddingSubstituter: ${{ env.NIXOS_RUNNER == '1' }}
+        useDaemon: ${{ env.NIXOS_RUNNER != '1' }}
 
     - name: Enable KVM on namespace.so
       if: env.NAMESPACE_RUNNER
