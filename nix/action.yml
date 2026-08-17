@@ -53,7 +53,7 @@ runs:
       shell: bash
       run: echo "NIX_PATH=${{ inputs.nix_path }}" >> $GITHUB_ENV
 
-    - uses: cachix/cachix-action@v16
+    - uses: cachix/cachix-action@v17
       with:
         name: ${{ inputs.cache }}
         authToken: ${{ inputs.auth_token }}
