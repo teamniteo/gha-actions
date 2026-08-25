@@ -5,8 +5,10 @@ description:
 
 inputs:
   minutes:
-    description: How long to hold the job before giving up and carrying on
-    default: "30"
+    description:
+      How long to hold the job open. Short by default on purpose, because a
+      paused job keeps its slot and no other work can use it.
+    default: "1"
 
 runs:
   using: "composite"
@@ -21,23 +23,38 @@ runs:
         BOX="${RUNNER_NAME%%-*}"
         rm -f "$SENTINEL"
 
+        UNIT=minutes
+        [ "$HOLD_MINUTES" = "1" ] && UNIT=minute
+
         if [ -d /run/current-system ]; then
           cat <<EOF
         ==========================================================
-         Job paused for up to $HOLD_MINUTES minutes. To look inside it:
+         Job paused for $HOLD_MINUTES $UNIT. To look inside it:
 
            ssh $BOX.niteo.co
            sudo /etc/nixos/debug-github-runner $RUNNER_NAME
 
-         Workspace:  $GITHUB_WORKSPACE
-         Let the job carry on:  touch $SENTINEL
+         The checkout is at:
+           $GITHUB_WORKSPACE
 
-         This slot cannot take other work until then.
+         When you are done, let the job carry on with:
+           touch $SENTINEL
+
+         Leaving the shell does not do that by itself. Waiting it out
+         works too: the job resumes on its own when the time is up.
+
+         Need longer than $HOLD_MINUTES $UNIT?
+           - uses: teamniteo/gha-actions/debug-shell@v19
+             with:
+               minutes: 30
+
+         Until then this slot cannot take other work.
         ==========================================================
         EOF
         else
           echo "Not a Niteo NixOS runner ($RUNNER_NAME), so there is no box to"
-          echo "ssh into. Pausing anyway so the run does not disappear."
+          echo "ssh into. Pausing for $HOLD_MINUTES $UNIT anyway so the run does"
+          echo "not disappear; touch $SENTINEL to carry on."
         fi
 
         DEADLINE=$(( $(date +%s) + HOLD_MINUTES * 60 ))
@@ -46,6 +63,6 @@ runs:
             echo "Released, carrying on."
             exit 0
           fi
-          sleep 10
+          sleep 5
         done
-        echo "Nobody attached within $HOLD_MINUTES minutes, carrying on."
+        echo "Nobody attached within $HOLD_MINUTES $UNIT, carrying on."
