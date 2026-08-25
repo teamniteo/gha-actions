@@ -43,36 +43,35 @@ runs:
         WAIT_UNIT=minutes
         [ "$WAIT_MINUTES" = "1" ] && WAIT_UNIT=minute
 
+        BOLD=$(printf '\033[1m'); CYAN=$(printf '\033[1;36m')
+        DIM=$(printf '\033[2m'); OFF=$(printf '\033[0m')
+        ATTACH="ssh -A -t $BOX.niteo.co sudo /etc/nixos/debug-github-runner $RUNNER_NAME"
+
         if [ -d /run/current-system ]; then
+          # Also lands at the top of the run summary, where nobody has to go
+          # hunting through the log for it
+          echo "::notice title=Job paused for debugging::$ATTACH"
+
           cat <<EOF
-        ==========================================================
-         Waiting $WAIT_MINUTES $WAIT_UNIT for someone to attach. If nobody
-         does, the job carries on by itself.
 
-           ssh -A $BOX.niteo.co
-           sudo /etc/nixos/debug-github-runner $RUNNER_NAME
+        ${DIM}──────────────────────────────────────────────────────────────${OFF}
+         ${BOLD}Job paused. Copy this to get a shell inside it:${OFF}
 
-         The -A matters for sudoers: sudo on that box authenticates
-         against your forwarded agent, and without one it asks for a
-         password nobody has.
+           ${CYAN}$ATTACH${OFF}
 
-         Attaching stops that clock. You then have up to
-         $MAX_HOLD_MINUTES minutes, and the job finishes the moment you run
+         ${BOLD}When you are done${OFF}, let the job finish:
 
-           rm $HOLD
+           ${CYAN}rm $HOLD${OFF}
 
-         The checkout is at
-           $GITHUB_WORKSPACE
+         Waiting $WAIT_MINUTES $WAIT_UNIT for someone to attach, then the
+         job carries on by itself. Attaching stops that clock and gives
+         you up to $MAX_HOLD_MINUTES minutes. Until the job carries on,
+         this slot takes no other work.
 
-         Want longer to show up, or a longer session?
+         ${DIM}Checkout: $GITHUB_WORKSPACE${OFF}
+         ${DIM}Longer next time: with: { wait_minutes: 5, max_hold_minutes: 120 }${OFF}
+        ${DIM}──────────────────────────────────────────────────────────────${OFF}
 
-           - uses: teamniteo/gha-actions/debug-shell@v19
-             with:
-               wait_minutes: 5          # now $WAIT_MINUTES
-               max_hold_minutes: 120    # now $MAX_HOLD_MINUTES
-
-         Until the job carries on, this slot cannot take other work.
-        ==========================================================
         EOF
         else
           echo "Not a Niteo NixOS runner ($RUNNER_NAME), so there is no box to"
