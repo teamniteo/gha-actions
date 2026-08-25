@@ -6,9 +6,14 @@ description:
 inputs:
   minutes:
     description:
-      How long to hold the job open. Short by default on purpose, because a
-      paused job keeps its slot and no other work can use it.
+      How long to wait for someone to attach. Short by default, because this
+      is only the window for showing up and attaching stops the clock.
     default: "1"
+  max_minutes:
+    description:
+      Backstop once someone has attached, so a forgotten debug session cannot
+      hold a runner slot until the job's own timeout fires hours later.
+    default: "60"
 
 runs:
   using: "composite"
@@ -18,10 +23,22 @@ runs:
       shell: bash
       env:
         HOLD_MINUTES: ${{ inputs.minutes }}
+        MAX_MINUTES: ${{ inputs.max_minutes }}
       run: |
-        SENTINEL="$RUNNER_TEMP/continue"
+        HOLD="$RUNNER_TEMP/debug-hold"
         BOX="${RUNNER_NAME%%-*}"
-        rm -f "$SENTINEL"
+        rm -f "$HOLD"
+
+        # Whole numbers only. Anything else leaves the arithmetic below empty,
+        # and the step would sail past without pausing at all.
+        case "$HOLD_MINUTES" in ''|*[!0-9]*)
+          echo "minutes must be a whole number, got '$HOLD_MINUTES'. Using 1."
+          HOLD_MINUTES=1 ;;
+        esac
+        case "$MAX_MINUTES" in ''|*[!0-9]*)
+          echo "max_minutes must be a whole number, got '$MAX_MINUTES'. Using 60."
+          MAX_MINUTES=60 ;;
+        esac
 
         UNIT=minutes
         [ "$HOLD_MINUTES" = "1" ] && UNIT=minute
@@ -29,38 +46,43 @@ runs:
         if [ -d /run/current-system ]; then
           cat <<EOF
         ==========================================================
-         Job paused for $HOLD_MINUTES $UNIT. To look inside it:
+         Waiting $HOLD_MINUTES $UNIT for someone to attach:
 
            ssh $BOX.niteo.co
            sudo /etc/nixos/debug-github-runner $RUNNER_NAME
 
+         Attaching stops the clock, so take as long as you need once
+         you are in. When you are done, let the job finish with:
+
+           rm $HOLD
+
          The checkout is at:
            $GITHUB_WORKSPACE
 
-         When you are done, let the job carry on with:
-           touch $SENTINEL
-
-         Leaving the shell does not do that by itself. Waiting it out
-         works too: the job resumes on its own when the time is up.
-
-         Need longer than $HOLD_MINUTES $UNIT?
-           - uses: teamniteo/gha-actions/debug-shell@v19
-             with:
-               minutes: 30
-
-         Until then this slot cannot take other work.
+         Nobody attaching within $HOLD_MINUTES $UNIT lets the job carry
+         on by itself. Until then this slot cannot take other work.
         ==========================================================
         EOF
         else
           echo "Not a Niteo NixOS runner ($RUNNER_NAME), so there is no box to"
-          echo "ssh into. Pausing for $HOLD_MINUTES $UNIT anyway so the run does"
-          echo "not disappear; touch $SENTINEL to carry on."
+          echo "ssh into. Waiting $HOLD_MINUTES $UNIT anyway; touch $HOLD to hold"
+          echo "the job, remove it to carry on."
         fi
 
         DEADLINE=$(( $(date +%s) + HOLD_MINUTES * 60 ))
         while [ "$(date +%s)" -lt "$DEADLINE" ]; do
-          if [ -e "$SENTINEL" ]; then
-            echo "Released, carrying on."
+          if [ -e "$HOLD" ]; then
+            echo "Someone attached, so the countdown stops here."
+            echo "The job resumes when $HOLD is removed (at the latest in $MAX_MINUTES minutes)."
+            BACKSTOP=$(( $(date +%s) + MAX_MINUTES * 60 ))
+            while [ -e "$HOLD" ] && [ "$(date +%s)" -lt "$BACKSTOP" ]; do
+              sleep 5
+            done
+            if [ -e "$HOLD" ]; then
+              echo "Still held after $MAX_MINUTES minutes, carrying on anyway."
+            else
+              echo "Released, carrying on."
+            fi
             exit 0
           fi
           sleep 5
