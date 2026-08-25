@@ -77,3 +77,34 @@ runs:
       shell: bash
       run: nix-shell --run "echo 'nix-shell successfully entered'"
 
+
+    # Report how long this job waited for a runner, for the box's Prometheus
+    # metrics. Only the job itself can measure this: the queue is over by the
+    # time the runner is handed the job, so the machine cannot observe it.
+    #
+    # Best effort throughout. This runs in every job on every NixOS runner, so
+    # it must never be why a build goes red: no jq, no token permission or no
+    # network all mean "log nothing" rather than "fail".
+    - name: Record queue time for the runner metrics
+      if: always() && env.NIXOS_RUNNER
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+      run: |
+        {
+          command -v jq > /dev/null || exit 0
+
+          # Our own job is the one in progress on this runner: an ephemeral
+          # runner only ever holds one job at a time
+          LINE=$(curl -sf --connect-timeout 5 --max-time 15 \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/jobs?per_page=100" \
+            | jq -r --arg runner "$RUNNER_NAME" '
+                .jobs[]
+                | select(.runner_name == $runner and .status == "in_progress")
+                | "job=\(.id) seconds=\((.started_at | fromdateiso8601) - (.created_at | fromdateiso8601))"
+              ' | head -1)
+
+          [ -n "$LINE" ] && logger -t gha-queue "$LINE"
+        } || true
