@@ -94,6 +94,12 @@ runs:
         {
           command -v jq > /dev/null || exit 0
 
+          # The runner's PATH is extraPackages, which has jq and curl but not
+          # util-linux. This step only runs on NixOS, so the system profile is
+          # where logger definitely is.
+          LOGGER=$(command -v logger || echo /run/current-system/sw/bin/logger)
+          [ -x "$LOGGER" ] || exit 0
+
           # Our own job is the one in progress on this runner: an ephemeral
           # runner only ever holds one job at a time
           LINE=$(curl -sf --connect-timeout 5 --max-time 15 \
@@ -106,5 +112,5 @@ runs:
                 | "job=\(.id) seconds=\((.started_at | fromdateiso8601) - (.created_at | fromdateiso8601))"
               ' | head -1)
 
-          [ -n "$LINE" ] && logger -t gha-queue "$LINE"
+          [ -n "$LINE" ] && "$LOGGER" -t gha-queue "$LINE"
         } || true
