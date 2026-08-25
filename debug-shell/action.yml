@@ -4,15 +4,15 @@ description:
   inside it
 
 inputs:
-  minutes:
+  wait_minutes:
     description:
       How long to wait for someone to attach. Short by default, because this
-      is only the window for showing up and attaching stops the clock.
+      is only the window for showing up, and attaching stops the clock.
     default: "1"
-  max_minutes:
+  max_hold_minutes:
     description:
-      Backstop once someone has attached, so a forgotten debug session cannot
-      hold a runner slot until the job's own timeout fires hours later.
+      Longest the job will be held once someone has attached. A backstop, so a
+      session somebody walked away from cannot pin a runner slot for hours.
     default: "60"
 
 runs:
@@ -22,8 +22,8 @@ runs:
     - name: Pause and say how to attach
       shell: bash
       env:
-        HOLD_MINUTES: ${{ inputs.minutes }}
-        MAX_MINUTES: ${{ inputs.max_minutes }}
+        WAIT_MINUTES: ${{ inputs.wait_minutes }}
+        MAX_HOLD_MINUTES: ${{ inputs.max_hold_minutes }}
       run: |
         HOLD="$RUNNER_TEMP/debug-hold"
         BOX="${RUNNER_NAME%%-*}"
@@ -31,55 +31,62 @@ runs:
 
         # Whole numbers only. Anything else leaves the arithmetic below empty,
         # and the step would sail past without pausing at all.
-        case "$HOLD_MINUTES" in ''|*[!0-9]*)
-          echo "minutes must be a whole number, got '$HOLD_MINUTES'. Using 1."
-          HOLD_MINUTES=1 ;;
+        case "$WAIT_MINUTES" in ''|*[!0-9]*)
+          echo "wait_minutes must be a whole number, got '$WAIT_MINUTES'. Using 1."
+          WAIT_MINUTES=1 ;;
         esac
-        case "$MAX_MINUTES" in ''|*[!0-9]*)
-          echo "max_minutes must be a whole number, got '$MAX_MINUTES'. Using 60."
-          MAX_MINUTES=60 ;;
+        case "$MAX_HOLD_MINUTES" in ''|*[!0-9]*)
+          echo "max_hold_minutes must be a whole number, got '$MAX_HOLD_MINUTES'. Using 60."
+          MAX_HOLD_MINUTES=60 ;;
         esac
 
-        UNIT=minutes
-        [ "$HOLD_MINUTES" = "1" ] && UNIT=minute
+        WAIT_UNIT=minutes
+        [ "$WAIT_MINUTES" = "1" ] && WAIT_UNIT=minute
 
         if [ -d /run/current-system ]; then
           cat <<EOF
         ==========================================================
-         Waiting $HOLD_MINUTES $UNIT for someone to attach:
+         Waiting $WAIT_MINUTES $WAIT_UNIT for someone to attach. If nobody
+         does, the job carries on by itself.
 
            ssh $BOX.niteo.co
            sudo /etc/nixos/debug-github-runner $RUNNER_NAME
 
-         Attaching stops the clock, so take as long as you need once
-         you are in. When you are done, let the job finish with:
+         Attaching stops that clock. You then have up to
+         $MAX_HOLD_MINUTES minutes, and the job finishes the moment you run
 
            rm $HOLD
 
-         The checkout is at:
+         The checkout is at
            $GITHUB_WORKSPACE
 
-         Nobody attaching within $HOLD_MINUTES $UNIT lets the job carry
-         on by itself. Until then this slot cannot take other work.
+         Want longer to show up, or a longer session?
+
+           - uses: teamniteo/gha-actions/debug-shell@v19
+             with:
+               wait_minutes: 5          # now $WAIT_MINUTES
+               max_hold_minutes: 120    # now $MAX_HOLD_MINUTES
+
+         Until the job carries on, this slot cannot take other work.
         ==========================================================
         EOF
         else
           echo "Not a Niteo NixOS runner ($RUNNER_NAME), so there is no box to"
-          echo "ssh into. Waiting $HOLD_MINUTES $UNIT anyway; touch $HOLD to hold"
-          echo "the job, remove it to carry on."
+          echo "ssh into. Waiting $WAIT_MINUTES $WAIT_UNIT anyway; touch $HOLD to"
+          echo "hold the job, remove it to carry on."
         fi
 
-        DEADLINE=$(( $(date +%s) + HOLD_MINUTES * 60 ))
+        DEADLINE=$(( $(date +%s) + WAIT_MINUTES * 60 ))
         while [ "$(date +%s)" -lt "$DEADLINE" ]; do
           if [ -e "$HOLD" ]; then
             echo "Someone attached, so the countdown stops here."
-            echo "The job resumes when $HOLD is removed (at the latest in $MAX_MINUTES minutes)."
-            BACKSTOP=$(( $(date +%s) + MAX_MINUTES * 60 ))
+            echo "The job resumes when $HOLD is removed, or in $MAX_HOLD_MINUTES minutes at the latest."
+            BACKSTOP=$(( $(date +%s) + MAX_HOLD_MINUTES * 60 ))
             while [ -e "$HOLD" ] && [ "$(date +%s)" -lt "$BACKSTOP" ]; do
               sleep 5
             done
             if [ -e "$HOLD" ]; then
-              echo "Still held after $MAX_MINUTES minutes, carrying on anyway."
+              echo "Still held after $MAX_HOLD_MINUTES minutes, carrying on anyway."
             else
               echo "Released, carrying on."
             fi
@@ -87,4 +94,4 @@ runs:
           fi
           sleep 5
         done
-        echo "Nobody attached within $HOLD_MINUTES $UNIT, carrying on."
+        echo "Nobody attached within $WAIT_MINUTES $WAIT_UNIT, carrying on."
