@@ -1,0 +1,51 @@
+name: "Pause for debugging"
+description:
+  Hold the job open on a Niteo NixOS runner and print how to open a shell
+  inside it
+
+inputs:
+  minutes:
+    description: How long to hold the job before giving up and carrying on
+    default: "30"
+
+runs:
+  using: "composite"
+  steps:
+
+    - name: Pause and say how to attach
+      shell: bash
+      env:
+        HOLD_MINUTES: ${{ inputs.minutes }}
+      run: |
+        SENTINEL="$RUNNER_TEMP/continue"
+        BOX="${RUNNER_NAME%%-*}"
+        rm -f "$SENTINEL"
+
+        if [ -d /run/current-system ]; then
+          cat <<EOF
+        ==========================================================
+         Job paused for up to $HOLD_MINUTES minutes. To look inside it:
+
+           ssh $BOX.niteo.co
+           sudo /etc/nixos/debug-github-runner $RUNNER_NAME
+
+         Workspace:  $GITHUB_WORKSPACE
+         Let the job carry on:  touch $SENTINEL
+
+         This slot cannot take other work until then.
+        ==========================================================
+        EOF
+        else
+          echo "Not a Niteo NixOS runner ($RUNNER_NAME), so there is no box to"
+          echo "ssh into. Pausing anyway so the run does not disappear."
+        fi
+
+        DEADLINE=$(( $(date +%s) + HOLD_MINUTES * 60 ))
+        while [ "$(date +%s)" -lt "$DEADLINE" ]; do
+          if [ -e "$SENTINEL" ]; then
+            echo "Released, carrying on."
+            exit 0
+          fi
+          sleep 10
+        done
+        echo "Nobody attached within $HOLD_MINUTES minutes, carrying on."
