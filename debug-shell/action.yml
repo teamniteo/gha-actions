@@ -49,8 +49,12 @@ runs:
          Waiting $WAIT_MINUTES $WAIT_UNIT for someone to attach. If nobody
          does, the job carries on by itself.
 
-           ssh $BOX.niteo.co
+           ssh -A $BOX.niteo.co
            sudo /etc/nixos/debug-github-runner $RUNNER_NAME
+
+         The -A matters for sudoers: sudo on that box authenticates
+         against your forwarded agent, and without one it asks for a
+         password nobody has.
 
          Attaching stops that clock. You then have up to
          $MAX_HOLD_MINUTES minutes, and the job finishes the moment you run
