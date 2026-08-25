@@ -112,5 +112,10 @@ runs:
                 | "job=\(.id) seconds=\((.started_at | fromdateiso8601) - (.created_at | fromdateiso8601))"
               ' | head -1)
 
-          [ -n "$LINE" ] && "$LOGGER" -t gha-queue "$LINE"
+          if [ -n "$LINE" ]; then
+            "$LOGGER" -t gha-queue "$LINE"
+            echo "Waited ${LINE#*seconds=}s in the queue before $RUNNER_NAME picked this job up"
+          else
+            echo "No queue time reported: the API returned nothing for this runner"
+          fi
         } || true
