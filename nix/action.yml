@@ -41,6 +41,45 @@ runs:
           /nix
           ~/.elm
 
+    # NIX_PATH is one variable for the whole job, but a caller that sets
+    # `defaults.run.working-directory` writes it relative to that directory --
+    # while this action's own steps always run from the workspace root. An
+    # entry like `nixpkgs=../nix/default.nix` is then outside the checkout
+    # here, nix drops it with "search path entry does not exist, ignoring",
+    # <nixpkgs> stops resolving, and nix-shell silently falls back to whatever
+    # bash it can find. Fail on it instead of degrading quietly.
+    - name: Check nix_path resolves
+      shell: bash
+      env:
+        NIX_PATH_IN: ${{ inputs.nix_path }}
+      run: |
+        status=0
+        IFS=':' read -ra entries <<< "$NIX_PATH_IN"
+        for entry in "${entries[@]}"; do
+          [[ "$entry" == *=* ]] || continue
+          name="${entry%%=*}"
+          path="${entry#*=}"
+
+          # Only filesystem paths are ours to check. Bare names and the halves
+          # a colon split leaves behind -- `flake:nixpkgs` becomes
+          # `nixpkgs=flake` plus `nixpkgs` -- are skipped rather than guessed at.
+          case "$path" in
+            ./* | ../* | /*) ;;
+            *) continue ;;
+          esac
+
+          if [ ! -e "$path" ]; then
+            echo "::error::nix_path entry '$name=$path' does not exist relative to $PWD"
+            echo "This action's steps run from the workspace root, so a path written"
+            echo "relative to a job's defaults.run.working-directory does not resolve"
+            echo "here -- and NIX_PATH is one variable shared by both. Use an absolute"
+            echo "path so it is correct from either:"
+            echo "    nix_path: 'nixpkgs=\${{ github.workspace }}/nix/default.nix'"
+            status=1
+          fi
+        done
+        exit $status
+
     - uses: cachix/install-nix-action@v27
       if: ${{ !env.NIXOS_RUNNER }}
       with:
