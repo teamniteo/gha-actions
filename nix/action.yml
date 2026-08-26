@@ -103,18 +103,8 @@ runs:
     # Build and evaluate the shell exactly once. nix print-dev-env realizes
     # the same derivations the old `nix-shell --run echo` warm-up built, and
     # additionally captures the resulting environment -- one step, both jobs.
-    #
     # The captured environment is offered to every later bash via BASH_ENV,
-    # behind a guard on IN_NIX_SHELL: a step whose shell is still the
-    # `nix-shell --run "bash {0}"` wrapper is already inside the environment
-    # (nix-shell exports IN_NIX_SHELL), so the wrapper skips and nothing
-    # changes for it. A workflow collects the speedup by switching
-    # defaults.run.shell to plain bash -- steps then source a file instead of
-    # paying the full nixpkgs evaluation each, which classic nix-shell repeats
-    # per step because it has no eval cache. The guard also exports
-    # IN_NIX_SHELL itself, so bashes nested inside a step skip re-sourcing
-    # and the shellHook runs once per step. Hooks therefore must be cheap to
-    # re-enter -- guard expensive work the way canario's hook already does.
+    # so there is no need for nix-shell evaluation in every step.
     - name: Evaluate the shell
       shell: bash
       run: |
