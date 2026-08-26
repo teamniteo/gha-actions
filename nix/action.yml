@@ -100,10 +100,42 @@ runs:
         echo "=== CPU Virtualization Support ==="
         grep -E 'vmx|svm' /proc/cpuinfo | head -1 | grep -oE 'vmx|svm' && echo "CPU supports virtualization" || echo "CPU does NOT support virtualization"
 
-    - name: Build nix-shell
+    # Build and evaluate the shell exactly once. nix print-dev-env realizes
+    # the same derivations the old `nix-shell --run echo` warm-up built, and
+    # additionally captures the resulting environment -- one step, both jobs.
+    #
+    # The captured environment is offered to every later bash via BASH_ENV,
+    # behind a guard on IN_NIX_SHELL: a step whose shell is still the
+    # `nix-shell --run "bash {0}"` wrapper is already inside the environment
+    # (nix-shell exports IN_NIX_SHELL), so the wrapper skips and nothing
+    # changes for it. A workflow collects the speedup by switching
+    # defaults.run.shell to plain bash -- steps then source a file instead of
+    # paying the full nixpkgs evaluation each, which classic nix-shell repeats
+    # per step because it has no eval cache. The guard also exports
+    # IN_NIX_SHELL itself, so bashes nested inside a step skip re-sourcing
+    # and the shellHook runs once per step. Hooks therefore must be cheap to
+    # re-enter -- guard expensive work the way canario's hook already does.
+    - name: Evaluate the shell
       shell: bash
-      run: nix-shell --run "echo 'nix-shell successfully entered'"
+      run: |
+        nix --extra-experimental-features 'nix-command flakes' \
+          print-dev-env -f shell.nix > "$RUNNER_TEMP/nix-shell-env.bash"
 
+        cat > "$RUNNER_TEMP/nix-shell-bash-env.bash" <<'WRAPPER'
+        if [ -z "${IN_NIX_SHELL:-}" ]; then
+          source "$RUNNER_TEMP/nix-shell-env.bash"
+          export IN_NIX_SHELL="${IN_NIX_SHELL:-impure}"
+        fi
+        WRAPPER
+
+        # Prove it sources cleanly under the strict flags steps will use,
+        # before any step depends on it.
+        bash -eo pipefail -c '
+          source "$RUNNER_TEMP/nix-shell-bash-env.bash"
+          echo "shell environment sourced OK"
+        '
+
+        echo "BASH_ENV=$RUNNER_TEMP/nix-shell-bash-env.bash" >> "$GITHUB_ENV"
 
     # Report how long this job waited for a runner, for the box's Prometheus
     # metrics. Only the job itself can measure this: the queue is over by the
