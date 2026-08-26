@@ -9,7 +9,11 @@ inputs:
   cache:
     default: niteo
   nix_path:
-    default: nixpkgs=./nix/default.nix
+    description: >
+      Nix search path. Defaults to nixpkgs=<repo root>/nix/default.nix, the
+      root being `git rev-parse --show-toplevel`. Give a value to use it
+      verbatim, or "" to leave NIX_PATH alone.
+    default: auto
   push_filter:
     default:
 
@@ -41,17 +45,40 @@ runs:
           /nix
           ~/.elm
 
+    - name: Resolve nix_path
+      id: nix_path
+      shell: bash
+      env:
+        NIX_PATH_IN: ${{ inputs.nix_path }}
+      run: |
+        value="$NIX_PATH_IN"
+
+        if [ "$value" = auto ]; then
+          if ! root=$(git -C "$GITHUB_WORKSPACE" rev-parse --show-toplevel 2>/dev/null); then
+            echo "::error::$GITHUB_WORKSPACE is not a git work tree, so the repo root cannot be found. Pass nix_path explicitly."
+            exit 1
+          fi
+          value="nixpkgs=$root/nix/default.nix"
+        fi
+
+        if [ -n "$value" ] && [ ! -e "${value#*=}" ]; then
+          echo "::error::nix_path '$value' does not exist, relative to $PWD"
+          exit 1
+        fi
+
+        echo "value=$value" >> "$GITHUB_OUTPUT"
+
     - uses: cachix/install-nix-action@v27
       if: ${{ !env.NIXOS_RUNNER }}
       with:
-        nix_path: ${{ inputs.nix_path }}
+        nix_path: ${{ steps.nix_path.outputs.value }}
         extra_nix_config: |
           system-features = kvm nixos-test
 
     - name: Set NIX_PATH on NixOS runners
       if: env.NIXOS_RUNNER
       shell: bash
-      run: echo "NIX_PATH=${{ inputs.nix_path }}" >> $GITHUB_ENV
+      run: echo "NIX_PATH=${{ steps.nix_path.outputs.value }}" >> $GITHUB_ENV
 
     - uses: cachix/cachix-action@v17
       with:
