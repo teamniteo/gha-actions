@@ -116,6 +116,12 @@ runs:
           source "$RUNNER_TEMP/nix-shell-env.bash"
           export IN_NIX_SHELL="${IN_NIX_SHELL:-impure}"
         fi
+
+        # GitHub's implicit step shell is `bash -e {0}`: errexit but no
+        # pipefail, so a failure mid-pipeline is swallowed and only the last
+        # command decides the step's exit status. Set last, so the sourced
+        # environment cannot turn it back off.
+        set -o pipefail
         WRAPPER
 
         # Prove it sources cleanly under the strict flags steps will use,
