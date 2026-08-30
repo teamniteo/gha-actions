@@ -27,7 +27,7 @@ By default, this action assumes that:
 * You are using the `niteo` cachix cache.
 * You have `nix/default.nix` in your repo where nix can find nixpkgs.
 
-Every step that runs after this action already has the nix shell environment loaded, through `BASH_ENV` -- there is no need to wrap steps in `nix-shell --run`. The same hook turns on `set -o pipefail`, so a command that fails in the middle of a pipeline fails the step. GitHub's implicit step shell is `bash -e {0}`, which has errexit but no pipefail, so this closes that gap without every workflow having to declare `defaults.run.shell`.
+Every step that runs after this action already has the nix shell environment loaded, through `BASH_ENV` -- there is no need to wrap steps in `nix-shell --run`. The same hook turns on `set -o pipefail`, so a command that fails in the middle of a pipeline fails the step. 
 
 `NIX_PATH` defaults to `nixpkgs=<repo root>/nix/default.nix`, the root being
 `git rev-parse --show-toplevel`. It is absolute on purpose: `NIX_PATH` is one
