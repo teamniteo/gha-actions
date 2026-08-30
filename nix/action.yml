@@ -121,7 +121,7 @@ runs:
         # pipefail, so a failure mid-pipeline is swallowed and only the last
         # command decides the step's exit status. Set last, so the sourced
         # environment cannot turn it back off.
-        set -o pipefail
+        set -eo pipefail
         WRAPPER
 
         # Prove it sources cleanly under the strict flags steps will use,
