@@ -119,8 +119,21 @@ runs:
 
         # GitHub's implicit step shell is `bash -e {0}`: errexit but no
         # pipefail, so a failure mid-pipeline is swallowed and only the last
-        # command decides the step's exit status. Set last, so the sourced
-        # environment cannot turn it back off.
+        # command decides the step's exit status. That is what pipefail is
+        # here for.
+        #
+        # The errexit is not for that shell, which already has it. It is for
+        # the shells below it: bash does not pass flags to children, so
+        # anything starting a fresh one -- `nix-shell --run "..."`, a script
+        # in .github/scripts -- runs without errexit, and a multi-line script
+        # there walks straight past a failing line. `exit 1` inside a `( ... )`
+        # is the usual way this bites: it leaves the subshell, not the script.
+        # BASH_ENV is read by every non-interactive bash, so setting the flag
+        # here reaches those children too. Interactive shells do not read
+        # BASH_ENV, which is why this needs no guard against clobbering a
+        # developer's terminal.
+        #
+        # Set last, so the sourced environment cannot turn either back off.
         set -eo pipefail
         WRAPPER
 
