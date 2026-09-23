@@ -81,27 +81,42 @@ Or multiple files likes:
 
 # Fly Deploy Action
 
-This GitHub Action builds the project's container image, pushes it to the app's registry on Fly.io and deploys it. Run the nix action first: flyctl and skopeo come from the project's dev shell, and so does `make image`, which must leave the image stream script at `./result`.
+This GitHub Action builds the project's container image, pushes it to the app's registry on Fly.io and deploys it. Run the nix action first: flyctl, skopeo, uv and nix-build come from the project's dev shell.
+
+The action makes a relocatable venv from the project's `uv.lock` with the dev shell's Python and runs `nix-build -A image --arg venv <path>`, so the project's `default.nix` must expose an `image` attribute that takes `venv`. `fly-deploy/image.nix` is that image: the runtime Python, the venv and the app's files under `/app`, with `PATH` and CA certificates set. Fly's init does not use the image's `PATH` for `Cmd`, so spell out `/app/.venv/bin/...`. Reach it through a non-flake input on this repo:
+
+```nix
+image = import "${pkgs.flakeSources.gha-actions}/fly-deploy/image.nix" {
+  inherit pkgs python venv;
+  name = "registry.fly.io/canario";
+  app = lib.fileset.toSource { root = ./backend; fileset = lib.fileset.unions [ ./backend/etc ./backend/src ]; };
+  files."src/canario/static/dist" = ./frontend/dist;
+  cmd = [ "/app/.venv/bin/gunicorn" "--paste" "etc/production.ini" "--bind" ":8080" ];
+};
+```
 
 ```yaml
   - name: Deploy to Fly.io
     uses: teamniteo/gha-actions/fly-deploy@main
     with:
-      app: myproject
+      app: canario
       token: ${{ secrets.FLY_API_TOKEN }}
+      project: backend
+      prebuild: make -C frontend dist
 ```
 
-The image is tagged with the commit it was built from (`sha`, defaulting to the pull request head, the `workflow_run` head or `github.sha`), which the app also gets as `GIT_COMMIT`, next to `DEPLOYED_AT`. Pass `org` to create the app when it does not exist yet, which is what a review app needs, and `secrets` to stage `KEY=VALUE` lines before the deploy. The action outputs the app's `url`, and only returns once that URL answers, which a freshly created app takes a few seconds to do.
+Review apps give `org` so the app is created when it does not exist, and `secrets` as KEY=VALUE lines that are staged before the deploy. The `url` output is the app's fly.dev address.
 
 ```yaml
   - name: Deploy the review app
     id: deploy
     uses: teamniteo/gha-actions/fly-deploy@main
     with:
-      app: myproject-pr-${{ github.event.number }}
-      org: niteo
+      app: canario-pr-${{ github.event.number }}
+      org: canario-review
       token: ${{ secrets.FLY_API_TOKEN }}
       secrets: |
+        REVIEWAPP=true
         SENTRY_DSN=${{ secrets.SENTRY_DSN }}
 ```
 

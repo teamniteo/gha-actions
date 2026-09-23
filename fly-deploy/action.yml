@@ -1,7 +1,8 @@
 name: "Fly Deploy"
 description:
-  Build the image with make image, push it to the app's registry on Fly
-  and deploy it. Needs flyctl and skopeo, so run the nix action first.
+  Build the image with uv and Nix, push it to the app's registry on Fly
+  and deploy it. Needs flyctl, skopeo, uv and nix-build, so run the nix
+  action first.
 
 inputs:
   app:
@@ -19,9 +20,12 @@ inputs:
   secrets:
     description: KEY=VALUE lines to stage as app secrets before the deploy.
     default:
-  build:
-    description: Command that leaves the image stream script at ./result.
-    default: make image
+  project:
+    description: Directory holding the pyproject.toml and uv.lock the image's venv is built from.
+    default: .
+  prebuild:
+    description: Command to run before the venv is built, such as compiling a frontend.
+    default:
 
 outputs:
   url:
@@ -31,9 +35,20 @@ outputs:
 runs:
   using: "composite"
   steps:
+    - name: Prepare the app
+      if: ${{ inputs.prebuild != '' }}
+      shell: bash
+      run: ${{ inputs.prebuild }}
+
     - name: Build the image
       shell: bash
-      run: ${{ inputs.build }}
+      env:
+        PROJECT: ${{ inputs.project }}
+      run: |
+        venv=$(mktemp -d)/venv
+        uv venv --project "$PROJECT" --relocatable "$venv"
+        UV_PROJECT_ENVIRONMENT="$venv" uv sync --project "$PROJECT" --frozen --no-dev --no-editable
+        nix-build -A image --arg venv "$venv"
 
     - name: Create the app when it does not exist
       if: ${{ inputs.org != '' }}
