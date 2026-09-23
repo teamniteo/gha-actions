@@ -105,6 +105,12 @@ image = import "${pkgs.flakeSources.gha-actions}/fly-deploy/image.nix" {
       prebuild: make -C frontend dist
 ```
 
+The release command in `fly.toml` runs before any machine changes, so the old release would serve on the new schema for a minute. Give `migrations` the directory of the migration files and the action compares its tree with the running release's: when it changed, the machines are cordoned and stopped before the deploy and one is started after it, so neither release ever runs on the other's schema, at the cost of the app being down for about a minute on those deploys. Requests that arrive meanwhile wait at Fly's proxy and are answered by the new release.
+
+```yaml
+      migrations: backend/src/canario/db/versions
+```
+
 Review apps give `org` so the app is created when it does not exist, and `secrets` as KEY=VALUE lines that are staged before the deploy. The `url` output is the app's fly.dev address.
 
 ```yaml
