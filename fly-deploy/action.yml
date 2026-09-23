@@ -1,0 +1,74 @@
+name: "Fly Deploy"
+description:
+  Build the image with make image, push it to the app's registry on Fly
+  and deploy it. Needs flyctl and skopeo, so run the nix action first.
+
+inputs:
+  app:
+    description: Fly app name.
+    required: true
+  token:
+    description: Fly API token that can deploy the app, and create it when org is given.
+    required: true
+  org:
+    description: Create the app in this org when it does not exist yet. Leave empty for an app that must already exist.
+    default:
+  sha:
+    description: Commit the image is built from. Tags the image and reaches the app as GIT_COMMIT.
+    default: ${{ github.event.pull_request.head.sha || github.event.workflow_run.head_sha || github.sha }}
+  secrets:
+    description: KEY=VALUE lines to stage as app secrets before the deploy.
+    default:
+  build:
+    description: Command that leaves the image stream script at ./result.
+    default: make image
+
+outputs:
+  url:
+    description: The app's fly.dev URL.
+    value: https://${{ inputs.app }}.fly.dev
+
+runs:
+  using: "composite"
+  steps:
+    - name: Build the image
+      shell: bash
+      run: ${{ inputs.build }}
+
+    - name: Create the app when it does not exist
+      if: ${{ inputs.org != '' }}
+      shell: bash
+      env:
+        APP: ${{ inputs.app }}
+        FLY_API_TOKEN: ${{ inputs.token }}
+        ORG: ${{ inputs.org }}
+      run: flyctl status -a "$APP" > /dev/null 2>&1 || flyctl apps create "$APP" --org "$ORG"
+
+    - name: Push the image to the app's registry
+      shell: bash
+      env:
+        APP: ${{ inputs.app }}
+        FLY_API_TOKEN: ${{ inputs.token }}
+        SHA: ${{ inputs.sha }}
+      run: |
+        ./result > "$RUNNER_TEMP/image.tar"
+        skopeo --insecure-policy copy --retry-times 3 --dest-creds "x:$FLY_API_TOKEN" "docker-archive:$RUNNER_TEMP/image.tar" "docker://registry.fly.io/$APP:$SHA"
+
+    - name: Stage the secrets
+      if: ${{ inputs.secrets != '' }}
+      shell: bash
+      env:
+        APP: ${{ inputs.app }}
+        FLY_API_TOKEN: ${{ inputs.token }}
+        SECRETS: ${{ inputs.secrets }}
+      run: flyctl secrets import -a "$APP" --stage <<< "$SECRETS"
+
+    - name: Deploy
+      shell: bash
+      env:
+        APP: ${{ inputs.app }}
+        FLY_API_TOKEN: ${{ inputs.token }}
+        SHA: ${{ inputs.sha }}
+      run: |
+        flyctl deploy -a "$APP" --image "registry.fly.io/$APP:$SHA" --ha=false -e "GIT_COMMIT=$SHA" -e "DEPLOYED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+        flyctl ips list -a "$APP" | grep -q " v4 " || flyctl ips allocate-v4 --shared -a "$APP"

@@ -79,6 +79,45 @@ Or multiple files likes:
               !mockups/*.bmpr
 ```
 
+# Fly Deploy Action
+
+This GitHub Action builds the project's container image, pushes it to the app's registry on Fly.io and deploys it. Run the nix action first: flyctl and skopeo come from the project's dev shell, and so does `make image`, which must leave the image stream script at `./result`.
+
+```yaml
+  - name: Deploy to Fly.io
+    uses: teamniteo/gha-actions/fly-deploy@main
+    with:
+      app: myproject
+      token: ${{ secrets.FLY_API_TOKEN }}
+```
+
+The image is tagged with the commit it was built from (`sha`, defaulting to the pull request head, the `workflow_run` head or `github.sha`), which the app also gets as `GIT_COMMIT`, next to `DEPLOYED_AT`. Pass `org` to create the app when it does not exist yet, which is what a review app needs, and `secrets` to stage `KEY=VALUE` lines before the deploy. The action outputs the app's `url`.
+
+```yaml
+  - name: Deploy the review app
+    id: deploy
+    uses: teamniteo/gha-actions/fly-deploy@main
+    with:
+      app: myproject-pr-${{ github.event.number }}
+      org: niteo
+      token: ${{ secrets.FLY_API_TOKEN }}
+      secrets: |
+        SENTRY_DSN=${{ secrets.SENTRY_DSN }}
+```
+
+# Fly Destroy Action
+
+This GitHub Action destroys a Fly.io app when it exists, which is how a review app goes away with its pull request. Run the nix action first for flyctl.
+
+```yaml
+  - name: Destroy the review app
+    if: github.event.action == 'closed'
+    uses: teamniteo/gha-actions/fly-destroy@main
+    with:
+      app: myproject-pr-${{ github.event.number }}
+      token: ${{ secrets.FLY_API_TOKEN }}
+```
+
 ## We're hiring!
 
 At Niteo we regularly contribute back to the Open Source community. If you do too, we'd like to invite you to [join our team](https://niteo.co/careers)!

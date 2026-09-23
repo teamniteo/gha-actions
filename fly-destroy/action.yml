@@ -1,0 +1,25 @@
+name: "Fly Destroy"
+description:
+  Destroy the Fly app when it exists. Needs flyctl, so run the nix
+  action first.
+
+inputs:
+  app:
+    description: Fly app name.
+    required: true
+  token:
+    description: Fly API token that can destroy the app.
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Destroy the app
+      shell: bash
+      env:
+        APP: ${{ inputs.app }}
+        FLY_API_TOKEN: ${{ inputs.token }}
+      run: |
+        if flyctl status -a "$APP" > /dev/null 2>&1; then
+          flyctl apps destroy "$APP" --yes
+        fi
