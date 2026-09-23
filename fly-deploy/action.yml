@@ -72,3 +72,4 @@ runs:
       run: |
         flyctl deploy -a "$APP" --image "registry.fly.io/$APP:$SHA" --ha=false -e "GIT_COMMIT=$SHA" -e "DEPLOYED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
         flyctl ips list -a "$APP" | grep -q " v4 " || flyctl ips allocate-v4 --shared -a "$APP"
+        timeout 60 bash -c "until curl --silent --output /dev/null --max-time 10 https://$APP.fly.dev; do sleep 3; done"

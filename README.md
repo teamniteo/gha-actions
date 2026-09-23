@@ -91,7 +91,7 @@ This GitHub Action builds the project's container image, pushes it to the app's 
       token: ${{ secrets.FLY_API_TOKEN }}
 ```
 
-The image is tagged with the commit it was built from (`sha`, defaulting to the pull request head, the `workflow_run` head or `github.sha`), which the app also gets as `GIT_COMMIT`, next to `DEPLOYED_AT`. Pass `org` to create the app when it does not exist yet, which is what a review app needs, and `secrets` to stage `KEY=VALUE` lines before the deploy. The action outputs the app's `url`.
+The image is tagged with the commit it was built from (`sha`, defaulting to the pull request head, the `workflow_run` head or `github.sha`), which the app also gets as `GIT_COMMIT`, next to `DEPLOYED_AT`. Pass `org` to create the app when it does not exist yet, which is what a review app needs, and `secrets` to stage `KEY=VALUE` lines before the deploy. The action outputs the app's `url`, and only returns once that URL answers, which a freshly created app takes a few seconds to do.
 
 ```yaml
   - name: Deploy the review app
