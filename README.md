@@ -85,7 +85,7 @@ This GitHub Action builds the project's container image, pushes it to the app's 
 
 The action creates a relocatable venv from `uv.lock` and runs `nix-build -A image --arg venv <path>`. Define the image in the project's `default.nix` using `pkgs.dockerTools.streamLayeredImage`, and accept `venv` as an argument. Use `project` (default `.`) for the Python project directory and `prebuild` for commands to run before building.
 
-Each deployment cordons and stops all machines before deploying, then starts and uncordons them. Stop or release-command failures leave the machines cordoned. Configure the release command, service health checks and graceful shutdown in `fly.toml`.
+Each deployment cordons and stops all machines before deploying, then starts and uncordons them. Stop or release-command failures leave the machines cordoned. Configure the release command, service health checks and graceful shutdown in `backend/fly.toml` when the project has a `backend/` directory, or `fly.toml` at the repository root otherwise.
 
 ```yaml
   - name: Deploy to Fly.io
