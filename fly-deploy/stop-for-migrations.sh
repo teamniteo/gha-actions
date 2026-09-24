@@ -15,7 +15,7 @@ done < <(jq -r '.[].id' <<< "$machines")
 
 while read -r id state; do
   if [[ "$state" != stopped ]]; then
-    flyctl machine stop "$id" -a "$APP" --wait-timeout 5m
+    flyctl machine stop "$id" -a "$APP" --wait-timeout 1m
   fi
 done < <(jq -r '.[] | "\(.id) \(.state)"' <<< "$machines")
 echo "STOPPED_FOR_MIGRATIONS=1" >> "$GITHUB_ENV"
