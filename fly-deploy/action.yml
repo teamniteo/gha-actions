@@ -128,9 +128,7 @@ runs:
       shell: bash
       env:
         APP: ${{ inputs.app }}
-        FLY_API_TOKEN: ${{ inputs.token }}
       run: |
-        flyctl ips list -a "$APP" | grep -q " v4 " || flyctl ips allocate-v4 --shared -a "$APP"
         echo "Waiting for the app to become ready ..."
         deadline=$((SECONDS + 60))
         for attempt in {0..12}; do
