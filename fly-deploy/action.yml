@@ -88,19 +88,8 @@ runs:
         APP: ${{ inputs.app }}
         FLY_API_TOKEN: ${{ inputs.token }}
         MIGRATIONS: ${{ inputs.migrations }}
-      run: |
-        tree=$(git rev-parse "HEAD:$MIGRATIONS")
-        echo "MIGRATIONS_TREE=$tree" >> "$GITHUB_ENV"
-        machines=$(flyctl machine list -a "$APP" --json)
-        if [[ $(jq length <<< "$machines") == 0 || $(jq -r '.[0].config.env.MIGRATIONS_TREE' <<< "$machines") == "$tree" ]]; then
-          exit 0
-        fi
-        echo "The migrations changed since the running release: stopping the app for the deploy"
-        jq -r '.[] | "\(.id) \(.state)"' <<< "$machines" | while read -r id state; do
-          flyctl machine cordon "$id" -a "$APP"
-          [[ "$state" == started ]] && flyctl machine stop "$id" -a "$APP"
-        done
-        echo "STOPPED_FOR_MIGRATIONS=1" >> "$GITHUB_ENV"
+        ACTION_PATH: ${{ github.action_path }}
+      run: bash "$ACTION_PATH/stop-for-migrations.sh"
 
     - name: Deploy
       shell: bash
@@ -108,12 +97,5 @@ runs:
         APP: ${{ inputs.app }}
         FLY_API_TOKEN: ${{ inputs.token }}
         SHA: ${{ inputs.sha }}
-      run: |
-        flyctl deploy -a "$APP" --image "registry.fly.io/$APP:$SHA" --ha=false -e "GIT_COMMIT=$SHA" -e "DEPLOYED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)" ${MIGRATIONS_TREE:+-e "MIGRATIONS_TREE=$MIGRATIONS_TREE"}
-        if [[ "${STOPPED_FOR_MIGRATIONS:-}" ]]; then
-          machines=$(flyctl machine list -a "$APP" --json | jq -r '.[].id')
-          for id in $machines; do flyctl machine uncordon "$id" -a "$APP"; done
-          flyctl machine start "$(head -1 <<< "$machines")" -a "$APP"
-        fi
-        flyctl ips list -a "$APP" | grep -q " v4 " || flyctl ips allocate-v4 --shared -a "$APP"
-        timeout 60 bash -c "until curl --silent --output /dev/null --max-time 10 https://$APP.fly.dev; do sleep 3; done"
+        ACTION_PATH: ${{ github.action_path }}
+      run: bash "$ACTION_PATH/deploy.sh"
