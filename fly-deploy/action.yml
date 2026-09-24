@@ -100,7 +100,12 @@ runs:
         APP: ${{ inputs.app }}
         FLY_API_TOKEN: ${{ inputs.token }}
         SHA: ${{ inputs.sha }}
-      run: flyctl deploy -a "$APP" --image "registry.fly.io/$APP:$SHA" --ha=false -e "GIT_COMMIT=$SHA" -e "DEPLOYED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+      run: |
+        config=fly.toml
+        if [[ -d backend ]]; then
+          config=backend/fly.toml
+        fi
+        flyctl deploy --config "$config" -a "$APP" --image "registry.fly.io/$APP:$SHA" --ha=false -e "GIT_COMMIT=$SHA" -e "DEPLOYED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
     - name: Start the app
       shell: bash
