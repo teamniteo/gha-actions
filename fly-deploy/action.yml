@@ -1,7 +1,8 @@
 name: "Fly Deploy"
 description:
-  Build the image with make image, push it to the app's registry on Fly
-  and deploy it. Needs flyctl and skopeo, so run the nix action first.
+  Build the image with uv and Nix, push it to the app's registry on Fly
+  and deploy it. Needs flyctl, skopeo, uv and nix-build, so run the nix
+  action first.
 
 inputs:
   app:
@@ -19,9 +20,12 @@ inputs:
   secrets:
     description: KEY=VALUE lines to stage as app secrets before the deploy.
     default:
-  build:
-    description: Command that leaves the image stream script at ./result.
-    default: make image
+  project:
+    description: Directory holding the pyproject.toml and uv.lock the image's venv is built from.
+    default: .
+  prebuild:
+    description: Command to run before the venv is built, such as compiling a frontend.
+    default:
 
 outputs:
   url:
@@ -31,9 +35,20 @@ outputs:
 runs:
   using: "composite"
   steps:
+    - name: Prepare the app
+      if: ${{ inputs.prebuild != '' }}
+      shell: bash
+      run: ${{ inputs.prebuild }}
+
     - name: Build the image
       shell: bash
-      run: ${{ inputs.build }}
+      env:
+        PROJECT: ${{ inputs.project }}
+      run: |
+        venv=$(mktemp -d)/venv
+        uv venv --project "$PROJECT" --relocatable "$venv"
+        UV_PROJECT_ENVIRONMENT="$venv" uv sync --project "$PROJECT" --frozen --no-dev --no-editable
+        nix-build -A image --arg venv "$venv"
 
     - name: Create the app when it does not exist
       if: ${{ inputs.org != '' }}
@@ -63,13 +78,67 @@ runs:
         SECRETS: ${{ inputs.secrets }}
       run: flyctl secrets import -a "$APP" --stage <<< "$SECRETS"
 
+    - name: Stop the app
+      shell: bash
+      env:
+        APP: ${{ inputs.app }}
+        FLY_API_TOKEN: ${{ inputs.token }}
+      run: |
+        machines=$(flyctl machine list -a "$APP" --json)
+        for id in $(jq -r '.[].id' <<< "$machines"); do
+          flyctl machine cordon "$id" -a "$APP"
+        done
+        while read -r id state; do
+          if [[ "$state" != stopped ]]; then
+            flyctl machine stop "$id" -a "$APP" --wait-timeout 1m
+          fi
+        done < <(jq -r '.[] | "\(.id) \(.state)"' <<< "$machines")
+
     - name: Deploy
       shell: bash
       env:
         APP: ${{ inputs.app }}
         FLY_API_TOKEN: ${{ inputs.token }}
         SHA: ${{ inputs.sha }}
+      run: flyctl deploy -a "$APP" --image "registry.fly.io/$APP:$SHA" --ha=false -e "GIT_COMMIT=$SHA" -e "DEPLOYED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+    - name: Start the app
+      shell: bash
+      env:
+        APP: ${{ inputs.app }}
+        FLY_API_TOKEN: ${{ inputs.token }}
       run: |
-        flyctl deploy -a "$APP" --image "registry.fly.io/$APP:$SHA" --ha=false -e "GIT_COMMIT=$SHA" -e "DEPLOYED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+        machines=$(flyctl machine list -a "$APP" --json)
+        while read -r id state; do
+          if [[ "$state" != started ]]; then
+            flyctl machine start "$id" -a "$APP"
+          fi
+          flyctl machine wait "$id" -a "$APP" --state started --wait-timeout 1m
+        done < <(jq -r '.[] | "\(.id) \(.state)"' <<< "$machines")
+        for id in $(jq -r '.[].id' <<< "$machines"); do
+          flyctl machine uncordon "$id" -a "$APP"
+        done
+
+    - name: Check the app
+      shell: bash
+      env:
+        APP: ${{ inputs.app }}
+        FLY_API_TOKEN: ${{ inputs.token }}
+      run: |
         flyctl ips list -a "$APP" | grep -q " v4 " || flyctl ips allocate-v4 --shared -a "$APP"
-        timeout 60 bash -c "until curl --silent --output /dev/null --max-time 10 https://$APP.fly.dev; do sleep 3; done"
+        echo "Waiting for the app to become ready ..."
+        deadline=$((SECONDS + 60))
+        for attempt in {0..12}; do
+          if errors=$(curl --fail --silent --show-error --output /dev/null --max-time 10 "https://$APP.fly.dev" 2>&1); then
+            echo "The app is ready."
+            exit 0
+          fi
+          if (( attempt == 12 || SECONDS + 3 >= deadline )); then
+            break
+          fi
+          echo "Retrying ..."
+          sleep 3
+        done
+        echo "::error::The app did not become ready after deployment."
+        printf '%s\n' "$errors"
+        exit 1

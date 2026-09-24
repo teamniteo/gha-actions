@@ -81,7 +81,11 @@ Or multiple files likes:
 
 # Fly Deploy Action
 
-This GitHub Action builds the project's container image, pushes it to the app's registry on Fly.io and deploys it. Run the nix action first: flyctl and skopeo come from the project's dev shell, and so does `make image`, which must leave the image stream script at `./result`.
+This GitHub Action builds the project's container image, pushes it to the app's registry on Fly.io and deploys it. Run the nix action first: flyctl, skopeo, uv, nix-build, jq and curl must be available on `PATH`.
+
+The action creates a relocatable venv from `uv.lock` and runs `nix-build -A image --arg venv <path>`. Define the image in the project's `default.nix` using `pkgs.dockerTools.streamLayeredImage`, and accept `venv` as an argument. Use `project` (default `.`) for the Python project directory and `prebuild` for commands to run before building.
+
+Each deployment cordons and stops all machines before deploying, then starts and uncordons them. Stop or release-command failures leave the machines cordoned. Configure the release command, service health checks and graceful shutdown in `fly.toml`.
 
 ```yaml
   - name: Deploy to Fly.io
@@ -91,7 +95,7 @@ This GitHub Action builds the project's container image, pushes it to the app's 
       token: ${{ secrets.FLY_API_TOKEN }}
 ```
 
-The image is tagged with the commit it was built from (`sha`, defaulting to the pull request head, the `workflow_run` head or `github.sha`), which the app also gets as `GIT_COMMIT`, next to `DEPLOYED_AT`. Pass `org` to create the app when it does not exist yet, which is what a review app needs, and `secrets` to stage `KEY=VALUE` lines before the deploy. The action outputs the app's `url`, and only returns once that URL answers, which a freshly created app takes a few seconds to do.
+The image is tagged with the commit it was built from (`sha`, defaulting to the pull request head, the `workflow_run` head or `github.sha`), which the app also gets as `GIT_COMMIT`, next to `DEPLOYED_AT`. Pass `org` to create the app when it does not exist yet, which is what a review app needs, and `secrets` to stage `KEY=VALUE` lines before the deploy. The action outputs the app's `url` and waits for it to respond, failing the deployment if it remains unavailable after bounded retries.
 
 ```yaml
   - name: Deploy the review app
