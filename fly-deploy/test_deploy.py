@@ -56,8 +56,7 @@ elif command == "flyctl":
             machine["checks"] = []
     elif args[:2] == ["machine", "uncordon"]:
         machine = next(m for m in state if m["id"] == args[2])
-        assert machine["state"] == "started"
-        assert machine["checks"][0]["status"] == "passing"
+        assert any(m["state"] == "started" and m["checks"][0]["status"] == "passing" for m in state)
         machine["cordoned"] = False
     elif args[:2] == ["ips", "list"]:
         print("address v4 shared")
@@ -138,17 +137,23 @@ class DeployTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertFalse(self.calls("flyctl", "machine", "cordon"))
 
-    def test_changed_migrations_stop_every_machine_and_restore_after_health(self):
+    def test_changed_migrations_stop_all_and_start_only_one_before_restoring_traffic(
+        self,
+    ):
         result = self.run_deploy([machine("one"), machine("two")])
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(len(self.calls("flyctl", "machine", "stop")), 2)
+        self.assertEqual(len(self.calls("flyctl", "machine", "start")), 1)
         self.assertEqual(len(self.calls("flyctl", "machine", "uncordon")), 2)
+        machines = json.loads((self.root / "machines").read_text())
+        self.assertEqual([m["state"] for m in machines], ["started", "stopped"])
+        self.assertTrue(all(not m["cordoned"] for m in machines))
 
     def test_stopped_machine_does_not_abort_shutdown(self):
         result = self.run_deploy([machine("one"), machine("two", state="stopped")])
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(len(self.calls("flyctl", "machine", "stop")), 1)
-        self.assertEqual(len(self.calls("flyctl", "machine", "start")), 2)
+        self.assertEqual(len(self.calls("flyctl", "machine", "start")), 1)
 
     def test_all_machines_must_match_the_migration_tree(self):
         result = self.run_deploy([machine("one", tree="new"), machine("two")])
@@ -180,7 +185,9 @@ class DeployTests(unittest.TestCase):
     def test_unhealthy_missing_or_stale_checks_keep_maintenance(self):
         for failure in ("health", "missing", "stale"):
             with self.subTest(failure=failure):
-                result = self.run_deploy([machine("one")], failure=failure)
+                result = self.run_deploy(
+                    [machine("one"), machine("two")], failure=failure
+                )
                 self.assertNotEqual(result.returncode, 0)
                 self.assertFalse(self.calls("flyctl", "machine", "uncordon"))
 

@@ -105,7 +105,7 @@ image = import "${pkgs.flakeSources.gha-actions}/fly-deploy/image.nix" {
       prebuild: make -C frontend dist
 ```
 
-The release command in `fly.toml` runs before any machine changes. Give `migrations` the directory of migration files and the action compares its tree with every deployed machine's. When it differs, all machines are cordoned and the action waits for them to stop before deploying. Afterward, machines are started and their configured health checks must pass before routing is restored. A stop, migration, or startup failure leaves maintenance in place. Requests during maintenance may receive gateway errors; the app should provide an appropriate error page. Configure `kill_signal` and `kill_timeout` in `fly.toml` for the application's shutdown behavior.
+The release command in `fly.toml` runs before any machine changes. Give `migrations` the directory of migration files and the action compares its tree with every deployed machine's. When it differs, all machines are cordoned and the action waits for them to stop before deploying. Afterward, one machine is started and its configured health checks must pass before routing is restored for all updated machines. The remaining machines stay stopped and Fly can start them as demand requires when autostart is enabled. A stop, migration, or startup failure leaves maintenance in place. Requests during maintenance may receive gateway errors; the app should provide an appropriate error page. Configure `kill_signal` and `kill_timeout` in `fly.toml` for the application's shutdown behavior.
 
 ```yaml
       migrations: backend/src/canario/db/versions

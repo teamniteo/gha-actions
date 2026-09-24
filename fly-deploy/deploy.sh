@@ -4,19 +4,20 @@ set -euo pipefail
 flyctl deploy -a "$APP" --image "registry.fly.io/$APP:$SHA" --ha=false -e "GIT_COMMIT=$SHA" -e "DEPLOYED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)" ${MIGRATIONS_TREE:+-e "MIGRATIONS_TREE=$MIGRATIONS_TREE"}
 if [[ "${STOPPED_FOR_MIGRATIONS:-}" ]]; then
   machines=$(flyctl machine list -a "$APP" --json | jq -r '.[].id')
+  first_machine=$(head -n 1 <<< "$machines")
+  : "${first_machine:?No machine available to start after migrations}"
   started_at=$(date -u +%Y-%m-%dT%H:%M:%S)
-  for id in $machines; do
-    flyctl machine start "$id" -a "$APP"
-    flyctl machine wait "$id" -a "$APP" --state started --wait-timeout 5m
-  done
+  flyctl machine start "$first_machine" -a "$APP"
+  flyctl machine wait "$first_machine" -a "$APP" --state started --wait-timeout 5m
 
   # Deploy leaves stopped autostart machines stopped, without checking health.
   # https://github.com/teamniteo/ops/issues/2943
   ready=false
   for ((attempt = 0; attempt < 60; attempt++)); do
     status=$(flyctl machine list -a "$APP" --json)
-    if jq -e --arg started_at "$started_at" '
-      length > 0 and all(.[];
+    if jq -e --arg id "$first_machine" --arg started_at "$started_at" '
+      [.[] | select(.id == $id)] |
+      length == 1 and all(.[];
         .state == "started" and
         ((.checks // []) | length) >=
           ((.config.checks // {} | length) + ([.config.services[]?.checks[]?] | length)) and
@@ -29,7 +30,7 @@ if [[ "${STOPPED_FOR_MIGRATIONS:-}" ]]; then
     sleep 5
   done
   if [[ "$ready" != true ]]; then
-    echo "Machines failed their health checks; leaving the app cordoned" >&2
+    echo "Machine $first_machine failed its health checks; leaving the app cordoned" >&2
     exit 1
   fi
 
