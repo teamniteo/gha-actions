@@ -97,6 +97,8 @@ Each deployment cordons and stops all machines before deploying, then starts and
 
 The image is tagged with the commit it was built from (`sha`, defaulting to the pull request head, the `workflow_run` head or `github.sha`), which the app also gets as `GIT_COMMIT`, next to `DEPLOYED_AT`. Pass `org` to create the app when it does not exist yet, which is what a review app needs, and `secrets` to stage `KEY=VALUE` lines before the deploy. The action outputs the app's `url` and waits for it to respond, failing the deployment if it remains unavailable after bounded retries.
 
+Scheduled Machines, created once with `flyctl machine run --schedule hourly|daily|weekly|monthly`, can live in the same app. Before the app is stopped, a running job gets up to ten minutes to finish; the deploy then leaves the scheduled Machines alone and, before the app comes back, moves every one of them to the image that just went live. Fly offers no way to pause a schedule, so one can still fire during the deploy; that job runs the old image for the few seconds until the roll cuts it short, which is where the app has to guard itself, for example by refusing to start when its migrations and the database disagree.
+
 ```yaml
   - name: Deploy the review app
     id: deploy

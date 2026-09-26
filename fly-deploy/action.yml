@@ -78,6 +78,9 @@ runs:
         SECRETS: ${{ inputs.secrets }}
       run: flyctl secrets import -a "$APP" --stage <<< "$SECRETS"
 
+    # Scheduled Machines, made with `flyctl machine run --schedule`, live in
+    # the app next to the web ones. A job caught running gets ten minutes to
+    # finish while the app still serves; then only the web Machines stop.
     - name: Stop the app
       shell: bash
       env:
@@ -85,6 +88,12 @@ runs:
         FLY_API_TOKEN: ${{ inputs.token }}
       run: |
         machines=$(flyctl machine list -a "$APP" --json)
+        while read -r id name; do
+          echo "Waiting for scheduled Machine $name to finish its job"
+          flyctl machine wait "$id" -a "$APP" --state stopped --wait-timeout 10m \
+            || echo "::warning::Scheduled Machine $name still running after 10m, the deploy cuts its job short"
+        done < <(jq -r '.[] | select(.config.schedule != null and .state != "stopped") | "\(.id) \(.name)"' <<< "$machines")
+        machines=$(jq '[.[] | select(.config.schedule == null)]' <<< "$machines")
         for id in $(jq -r '.[].id' <<< "$machines"); do
           flyctl machine cordon "$id" -a "$APP"
         done
@@ -107,13 +116,31 @@ runs:
         fi
         flyctl deploy --config "$config" -a "$APP" --image "registry.fly.io/$APP:$SHA" --ha=false -e "GIT_COMMIT=$SHA" -e "DEPLOYED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
+    # `flyctl deploy` never updates a scheduled Machine, so move every one of
+    # them to the image that just went live, so none runs old code against a
+    # schema the release command may have migrated. They are stopped since the
+    # first step, unless a schedule fired meanwhile; that job is cut short.
+    - name: Roll the scheduled Machines onto the new image
+      shell: bash
+      env:
+        APP: ${{ inputs.app }}
+        FLY_API_TOKEN: ${{ inputs.token }}
+        SHA: ${{ inputs.sha }}
+      run: |
+        while read -r id state name; do
+          if [[ "$state" != stopped ]]; then
+            echo "::warning::Scheduled Machine $name started during the deploy, the update cuts its job short"
+          fi
+          flyctl machine update "$id" -a "$APP" --image "registry.fly.io/$APP:$SHA" --skip-start --yes
+        done < <(flyctl machine list -a "$APP" --json | jq -r '.[] | select(.config.schedule != null) | "\(.id) \(.state) \(.name)"')
+
     - name: Start the app
       shell: bash
       env:
         APP: ${{ inputs.app }}
         FLY_API_TOKEN: ${{ inputs.token }}
       run: |
-        machines=$(flyctl machine list -a "$APP" --json)
+        machines=$(flyctl machine list -a "$APP" --json | jq '[.[] | select(.config.schedule == null)]')
         while read -r id state; do
           if [[ "$state" != started ]]; then
             flyctl machine start "$id" -a "$APP"
