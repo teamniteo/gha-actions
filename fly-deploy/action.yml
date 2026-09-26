@@ -47,8 +47,6 @@ runs:
       run: |
         venv=$(mktemp -d)/venv
         uv venv --project "$PROJECT" --relocatable "$venv"
-        # uv reuses its cached build of the project until pyproject.toml
-        # changes, so a warm cache could ship an older commit's code.
         project=$(uv version --project "$PROJECT" | cut -d" " -f1)
         UV_PROJECT_ENVIRONMENT="$venv" uv sync --project "$PROJECT" --frozen --no-dev --no-editable --reinstall-package "$project"
         nix-build -A image --arg venv "$venv"
