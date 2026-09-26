@@ -47,7 +47,8 @@ runs:
       run: |
         venv=$(mktemp -d)/venv
         uv venv --project "$PROJECT" --relocatable "$venv"
-        UV_PROJECT_ENVIRONMENT="$venv" uv sync --project "$PROJECT" --frozen --no-dev --no-editable
+        project=$(uv version --project "$PROJECT" | cut -d" " -f1)
+        UV_PROJECT_ENVIRONMENT="$venv" uv sync --project "$PROJECT" --frozen --no-dev --no-editable --reinstall-package "$project"
         nix-build -A image --arg venv "$venv"
 
     - name: Create the app when it does not exist
