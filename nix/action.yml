@@ -80,7 +80,10 @@ runs:
       shell: bash
       run: echo "NIX_PATH=${{ steps.nix_path.outputs.value }}" >> $GITHUB_ENV
 
+    # The cache only speeds things up. Its push runs as this step's post
+    # phase, and a failed push must not fail a job that built fine.
     - uses: cachix/cachix-action@v17
+      continue-on-error: true
       with:
         name: ${{ inputs.cache }}
         authToken: ${{ inputs.auth_token }}
