@@ -26,6 +26,9 @@ inputs:
   prebuild:
     description: Command to run before the venv is built, such as compiling a frontend.
     default:
+  build:
+    description: Command that builds the image in place of the uv and nix-build steps, leaving the same executable ./result. For projects that are not Python.
+    default:
 
 outputs:
   url:
@@ -41,6 +44,12 @@ runs:
       run: ${{ inputs.prebuild }}
 
     - name: Build the image
+      if: ${{ inputs.build != '' }}
+      shell: bash
+      run: ${{ inputs.build }}
+
+    - name: Build the image
+      if: ${{ inputs.build == '' }}
       shell: bash
       env:
         PROJECT: ${{ inputs.project }}
