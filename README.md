@@ -27,7 +27,7 @@ By default, this action assumes that:
 * You are using the `niteo` cachix cache.
 * You have `nix/default.nix` in your repo where nix can find nixpkgs.
 
-Every step that runs after this action already has the nix shell environment loaded, through `BASH_ENV` -- there is no need to wrap steps in `nix-shell --run`. The same hook turns on `set -o pipefail`, so a command that fails in the middle of a pipeline fails the step. 
+Every step that runs after this action already has the nix shell environment loaded, through `BASH_ENV` -- there is no need to wrap steps in `nix-shell --run`. The same hook turns on `set -o pipefail`, so a command that fails in the middle of a pipeline fails the step.
 
 `NIX_PATH` defaults to `nixpkgs=<repo root>/nix/default.nix`, the root being
 `git rev-parse --show-toplevel`. It is absolute on purpose: `NIX_PATH` is one
@@ -51,6 +51,26 @@ You can set your project specific values like so:
       cache: myproject
       nix_path: 'nixpkgs=${{ github.workspace }}/other/default.nix'
       push_filter: (-source$|nixpkgs\.tar\.gz$)
+```
+
+# Debug Shell Action
+
+This GitHub Action pauses the job and prints the one-line `ssh` command that
+gets you a shell inside it.
+
+```yaml
+  - uses: teamniteo/gha-actions/debug-shell@main
+```
+
+The CI runners are on Tailscale, so turn Tailscale on before you paste the command.
+
+The pause is short by default: one minute for someone to show up. You can make it longer.
+
+```yaml
+  - uses: teamniteo/gha-actions/debug-shell@main
+    with:
+      wait_minutes: 5
+      max_hold_minutes: 120
 ```
 
 
