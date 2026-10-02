@@ -45,7 +45,7 @@ runs:
 
         BOLD=$(printf '\033[1m'); CYAN=$(printf '\033[1;36m')
         DIM=$(printf '\033[2m'); OFF=$(printf '\033[0m')
-        ATTACH="ssh -A -t $BOX.niteo.co sudo /etc/nixos/debug-github-runner $RUNNER_NAME"
+        ATTACH="ssh -A -t $BOX sudo /etc/nixos/debug-github-runner $RUNNER_NAME"
 
         if [ -d /run/current-system ]; then
           # Also lands at the top of the run summary, where nobody has to go
@@ -68,6 +68,7 @@ runs:
          you up to $MAX_HOLD_MINUTES minutes. Until the job carries on,
          this slot takes no other work.
 
+         ${DIM}The box is reachable over Tailscale, so turn it on first.${OFF}
          ${DIM}Checkout: $GITHUB_WORKSPACE${OFF}
          ${DIM}Longer next time: with: { wait_minutes: 5, max_hold_minutes: 120 }${OFF}
         ${DIM}──────────────────────────────────────────────────────────────${OFF}
