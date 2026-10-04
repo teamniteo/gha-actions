@@ -89,12 +89,14 @@ runs:
       run: flyctl secrets import -a "$APP" --stage <<< "$SECRETS"
 
     - name: Stop the app
+      id: stop
       shell: bash
       env:
         APP: ${{ inputs.app }}
         FLY_API_TOKEN: ${{ inputs.token }}
       run: |
-        machines=$(flyctl machine list -a "$APP" --json)
+        # Leave release-command Machines alone; only manage the app Machines.
+        machines=$(flyctl machine list -a "$APP" --json | jq '[.[] | select(.config.metadata.fly_process_group != "fly_app_release_command")]')
         for id in $(jq -r '.[].id' <<< "$machines"); do
           flyctl machine cordon "$id" -a "$APP"
         done
@@ -118,12 +120,16 @@ runs:
         flyctl deploy --config "$config" -a "$APP" --image "registry.fly.io/$APP:$SHA" --ha=false -e "GIT_COMMIT=$SHA" -e "DEPLOYED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
     - name: Start the app
+      # Once stopping was attempted, recover even if stopping or deployment failed.
+      # The original failure/cancellation still determines the action's result.
+      if: ${{ always() && steps.stop.outcome != 'skipped' }}
       shell: bash
       env:
         APP: ${{ inputs.app }}
         FLY_API_TOKEN: ${{ inputs.token }}
       run: |
-        machines=$(flyctl machine list -a "$APP" --json)
+        # Never restart a release-command Machine: it would rerun migrations.
+        machines=$(flyctl machine list -a "$APP" --json | jq '[.[] | select(.config.metadata.fly_process_group != "fly_app_release_command")]')
         while read -r id state; do
           if [[ "$state" != started ]]; then
             flyctl machine start "$id" -a "$APP"
