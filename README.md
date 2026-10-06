@@ -144,6 +144,56 @@ This GitHub Action destroys a Fly.io app when it exists, which is how a review a
       token: ${{ secrets.FLY_API_TOKEN }}
 ```
 
+# Claude Review Action
+
+This GitHub Action has Claude review a pull request. Claude leaves one inline comment per problem, and approves the pull request once every thread it opened is resolved and it finds nothing new. It cannot resolve threads, push or merge.
+
+Claude reviews against the project's conventions: the `rules` (default `conventions backend frontend alembic`) from [teamniteo/claude](https://github.com/teamniteo/claude) at the revision `nix/flake.lock` pins, or `main` if it pins none, and `.claude/skills-local/hindsight-review/` when the project has it. It also reads the description, the comments and the existing review threads, so it does not raise a point that a thread already covers or the discussion has settled.
+
+Run it on every pull request event. A check before Claude starts skips drafts, commits Claude already approved, and commits it already reviewed while its threads are still open, so most events take seconds. A `claude-review` commit status marks each commit Claude has reviewed. Resolving a thread does not trigger workflows: the next push, comment or review picks it up.
+
+The repository needs the [Claude GitHub App](https://github.com/apps/claude) installed and a `CLAUDE_CODE_OAUTH_TOKEN` secret from `claude setup-token`. Use GitHub-hosted runners: Claude's shell commands run in bubblewrap, which our NixOS runners do not allow. 
+
+```yaml
+name: Claude review
+
+on:
+  pull_request:
+    types: [opened, ready_for_review, reopened, synchronize]
+  pull_request_review:
+    types: [submitted]
+  pull_request_review_comment:
+    types: [created]
+  issue_comment:
+    types: [created]
+
+jobs:
+  review:
+    # Humans only: Claude's own reviews and comments would retrigger it.
+    if: >-
+      github.event.sender.type != 'Bot' &&
+      (github.event_name != 'issue_comment' || github.event.issue.pull_request)
+    runs-on: ubuntu-latest
+    # On the job, not the workflow: skipped runs (Claude's own events) must
+    # not replace a pending review in the queue.
+    concurrency:
+      group: claude-review-${{ github.event.pull_request.number || github.event.issue.number }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      pull-requests: read
+      statuses: write # marks the commit Claude reviewed
+      id-token: write # exchanged for a claude[bot] token
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          # issue_comment runs on the default branch; review the PR instead.
+          ref: ${{ github.event_name == 'issue_comment' && format('refs/pull/{0}/merge', github.event.issue.number) || '' }}
+      - uses: teamniteo/gha-actions/claude-review@main
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+```
+
 ## We're hiring!
 
 At Niteo we regularly contribute back to the Open Source community. If you do too, we'd like to invite you to [join our team](https://niteo.co/careers)!
