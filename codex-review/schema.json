@@ -1,0 +1,31 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["complete", "findings", "answers"],
+  "properties": {
+    "complete": {"type": "boolean"},
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["path", "line", "body"],
+        "properties": {
+          "path": {"type": "string"},
+          "line": {"type": "integer", "minimum": 1},
+          "body": {"type": "string"}
+        }
+      }
+    },
+    "answers": {
+      "type": "array",
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["comment_id", "body"],
+        "properties": {
+          "comment_id": {"type": "integer", "minimum": 0},
+          "body": {"type": "string"}
+        }
+      }
+    }
+  }
+}
