@@ -150,7 +150,7 @@ This GitHub Action has Claude review a pull request. Claude leaves one inline co
 
 Claude reviews against the project's conventions: the `rules` (default `conventions backend frontend alembic`) from [teamniteo/claude](https://github.com/teamniteo/claude) at the revision `nix/flake.lock` pins, or `main` if it pins none, and `.claude/skills-local/hindsight-review/` when the project has it. It also reads the description, the comments and the existing review threads, so it does not raise a point that a thread already covers or the discussion has settled.
 
-Mention `@claude` in a comment, review or review thread to ask it something: it answers with a comment, even when there is nothing new to review.
+Mention `@claude` in a comment, review or review thread to ask it something: it answers in the thread, or with a comment, even when there is nothing new to review.
 
 Run it on every pull request event. A check before Claude starts skips drafts, commits Claude already approved, and commits it already reviewed while its threads are still open, so most events take seconds. A comment that mentions `@claude` runs it anyway, to answer. A `claude-review` commit status marks each commit Claude has reviewed. Resolving a thread does not trigger workflows: the next push, comment or review picks it up.
 
