@@ -29,6 +29,9 @@ inputs:
   build:
     description: Command that builds the image in place of the uv and nix-build steps, leaving the same executable ./result. For projects that are not Python.
     default:
+  strategy:
+    description: How the app Machines get the new image. "stop" cordons and stops every app Machine, deploys, then starts and uncordons them. "rolling" leaves them running and has flyctl replace them one at a time, for an app that cannot go away on every deploy.
+    default: stop
 
 outputs:
   url:
@@ -88,8 +91,19 @@ runs:
         SECRETS: ${{ inputs.secrets }}
       run: flyctl secrets import -a "$APP" --stage <<< "$SECRETS"
 
+    - name: Check the strategy
+      shell: bash
+      env:
+        STRATEGY: ${{ inputs.strategy }}
+      run: |
+        case "$STRATEGY" in
+          stop|rolling) ;;
+          *) echo "::error::strategy must be stop or rolling, not '$STRATEGY'"; exit 1 ;;
+        esac
+
     - name: Stop the app
       id: stop
+      if: ${{ inputs.strategy == 'stop' }}
       shell: bash
       env:
         APP: ${{ inputs.app }}
@@ -112,12 +126,19 @@ runs:
         APP: ${{ inputs.app }}
         FLY_API_TOKEN: ${{ inputs.token }}
         SHA: ${{ inputs.sha }}
+        STRATEGY: ${{ inputs.strategy }}
       run: |
         config=fly.toml
         if [[ -d backend ]]; then
           config=backend/fly.toml
         fi
-        flyctl deploy --config "$config" -a "$APP" --image "registry.fly.io/$APP:$SHA" --ha=false -e "GIT_COMMIT=$SHA" -e "DEPLOYED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+        # With the Machines stopped flyctl's default strategy is as good as any;
+        # running Machines are replaced one at a time.
+        strategy=()
+        if [[ "$STRATEGY" == rolling ]]; then
+          strategy=(--strategy rolling)
+        fi
+        flyctl deploy --config "$config" -a "$APP" --image "registry.fly.io/$APP:$SHA" --ha=false "${strategy[@]}" -e "GIT_COMMIT=$SHA" -e "DEPLOYED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
     - name: Start the app
       # Once stopping was attempted, recover even if stopping or deployment failed.

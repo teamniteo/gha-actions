@@ -107,6 +107,8 @@ The action creates a relocatable venv from `uv.lock` and runs `nix-build -A imag
 
 Each deployment cordons and stops the app Machines before deploying, then starts and uncordons them. Once stopping has been attempted, the start-and-uncordon step also runs after failure or cancellation; the action still reports the original failure. Release-command Machines are excluded so cleanup cannot rerun migrations. A failed release command leaves the app Machines on their existing images, but a later rollout failure can leave some Machines updated. Restarting uses each Machine’s current image and does not undo database changes.
 
+An app that cannot go away on every deploy, such as one with always-on workers or several deploys a day, passes `strategy: rolling`: the Machines keep running and `flyctl deploy --strategy rolling` replaces them one at a time, so the release command has run before the first Machine changes and the old version keeps serving until its replacement passes its checks. There is nothing to restart afterwards; a rollout that fails part way leaves a mix of versions, which the next deploy or a `flyctl deploy --image` of the previous tag resolves.
+
 Configure the release command, service health checks and graceful shutdown in `backend/fly.toml` when the project has a `backend/` directory, or `fly.toml` at the repository root otherwise.
 
 ```yaml
