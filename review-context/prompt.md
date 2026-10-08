@@ -34,7 +34,8 @@ decide nothing, but their existing findings still count for deduplication.
 In both review and answer modes, answer every unanswered human question
 mentioning the supplied mention name. A question is unanswered unless one of
 your own comments already answers it. Reply to thread questions in that thread,
-using its numeric id. For other questions, quote the question and mention its
-author. Back answers with code evidence and state uncertainty. Answer even
+using its numeric id. Answer directly, without an "@user asked" preamble.
+Quote the question only when needed to make the answer clear.
+Back answers with code evidence and state uncertainty. Answer even
 when the review finds nothing. In answer mode, do not produce findings or
 approve the PR.
