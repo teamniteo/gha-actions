@@ -1,7 +1,6 @@
 # Alembic Action
 
-This GitHub Action verifies that you don't have missing migrations in your project
-by adding a step to your workflow.
+This GitHub Action verifies that you don't have missing migrations in your project by adding a step to your workflow.
 
 ```yaml
   - name: Checking consistency between alembic revision and models
@@ -12,9 +11,7 @@ by adding a step to your workflow.
 
 # NIX-Shell Action
 
-This GitHub Action sets nix up for use in CI. It supports GitHub managed
-runners, Namespace.so runners, and our own NixOS runners, on which it skips
-the installer entirely.
+This GitHub Action sets nix up for use in CI. It supports GitHub managed runners, Namespace.so runners, and our own NixOS runners, on which it skips the installer entirely.
 
 ```yaml
   - name: Configure nix
@@ -29,17 +26,9 @@ By default, this action assumes that:
 
 Every step that runs after this action already has the nix shell environment loaded, through `BASH_ENV` -- there is no need to wrap steps in `nix-shell --run`. The same hook turns on `set -o pipefail`, so a command that fails in the middle of a pipeline fails the step.
 
-`NIX_PATH` defaults to `nixpkgs=<repo root>/nix/default.nix`, the root being
-`git rev-parse --show-toplevel`. It is absolute on purpose: `NIX_PATH` is one
-variable for the whole job, but this action's steps run from the workspace
-root while a job with `defaults.run.working-directory` runs elsewhere, so a
-relative path cannot be correct for both.
+`NIX_PATH` defaults to `nixpkgs=<repo root>/nix/default.nix`, the root being `git rev-parse --show-toplevel`. It is absolute on purpose: `NIX_PATH` is one variable for the whole job, but this action's steps run from the workspace root while a job with `defaults.run.working-directory` runs elsewhere, so a relative path cannot be correct for both.
 
-Pass `nix_path` to override. The value is used exactly as given and must
-exist, or the job fails -- an unusable path would otherwise be dropped by nix,
-leaving `<nixpkgs>` unresolvable and `nix-shell` falling back to whatever bash
-it can find. Pass `""` to leave `NIX_PATH` alone, for a job that sets it
-itself.
+Pass `nix_path` to override. The value is used exactly as given and must exist, or the job fails -- an unusable path would otherwise be dropped by nix, leaving `<nixpkgs>` unresolvable and `nix-shell` falling back to whatever bash it can find. Pass `""` to leave `NIX_PATH` alone, for a job that sets it itself.
 
 You can set your project specific values like so:
 
@@ -53,10 +42,30 @@ You can set your project specific values like so:
       push_filter: (-source$|nixpkgs\.tar\.gz$)
 ```
 
+### Dist cache
+
+On runners with `HOST_CACHE_DIR` and Python 3, **Restore dist cache** and **Save dist cache** surround **Evaluate the shell**. Outputs are restored before Nix setup and saved immediately after successful shell setup. Projects opt in with `.github/dist-cache.json`; no Makefile or Nix shell-hook changes are needed:
+
+```json
+{
+  "inputs": ["frontend", "documentation", "default.nix", "shell.nix", "nix", "backend/src/trak/openapi.yaml"],
+  "git_dates": ["documentation/*.md"],
+  "outputs": ["frontend/dist", "frontend/.elm-land/src"],
+  "symlinks": {"backend/src/trak/static/dist": "frontend/dist"}
+}
+```
+
+Entries live under `$HOST_CACHE_DIR/dist`. All configured paths are checkout-relative. Include source inputs, generator code, Nix configuration and toolchain pins. Ignored generated files are excluded. The key includes source contents and declared environment values. Optional `git_dates` Git pathspecs include each matching file's last commit date (`%cs`), matching `make docs`; full Git history is required. Commit hashes are not included. Backend-only changes outside these inputs reuse the build. Saving uses the original key, computed before shell setup.
+
+Symlinks are recreated after restoring outputs so the existing shell hook can skip building. Completed outputs are published atomically; the host clears the cache at boot or after draining. Missing cache infrastructure uses normal setup, including on Namespace. Set `DIST_CACHE_ENABLED: "0"` for deployments.
+
+### Elm cache
+
+On host-cache runners, Elm always uses a private temporary `ELM_HOME`. **Restore Elm cache** copies a completed snapshot from `$HOST_CACHE_DIR/elm`; **Save Elm cache** publishes one atomically after successful shell setup. Snapshots are keyed by tracked `elm.json` files, `nix/`, root Nix configuration, repository and runner platform. Jobs never write into a shared package tree. No project configuration is needed; Namespace keeps its existing cache setup.
+
 # Debug Shell Action
 
-This GitHub Action pauses the job and prints the one-line `ssh` command that
-gets you a shell inside it.
+This GitHub Action pauses the job and prints the one-line `ssh` command that gets you a shell inside it.
 
 ```yaml
   - uses: teamniteo/gha-actions/debug-shell@main
@@ -156,7 +165,7 @@ Mention `@claude` in a comment, review or review thread to ask it something: it 
 
 Run it on every pull request event. A check before Claude starts skips drafts, commits Claude already approved, and commits it already reviewed while its threads are still open, so most events take seconds. On non-draft PRs, a comment that mentions `@claude` runs it anyway, to answer. Drafts never trigger reviews or answers. A `claude-review` commit status marks each commit Claude has reviewed. Resolving a thread does not trigger workflows: the next push, comment or review picks it up.
 
-The repository needs the [Claude GitHub App](https://github.com/apps/claude) installed and a `CLAUDE_CODE_OAUTH_TOKEN` secret from `claude setup-token`. Use GitHub-hosted runners: Claude's shell commands run in bubblewrap, which our NixOS runners do not allow. 
+The repository needs the [Claude GitHub App](https://github.com/apps/claude) installed and a `CLAUDE_CODE_OAUTH_TOKEN` secret from `claude setup-token`. Use GitHub-hosted runners: Claude's shell commands run in bubblewrap, which our NixOS runners do not allow.
 
 ```yaml
 name: Claude review
@@ -200,26 +209,11 @@ jobs:
 
 # Codex Review Action
 
-Reviews PRs against the same conventions as Claude, posts inline findings,
-answers `@codex-niteo` questions, and approves when its threads are resolved.
-Use a GitHub App installation token as `github_token`; the default bot name is
-`codex-niteo` (override with `bot_name`). The App needs Contents: read,
-Pull requests: write, Issues: write, and Commit statuses: write.
-Optional inputs: `rules` (default: `conventions backend frontend alembic`) and
-`model` (default: `gpt-6-sol`).
+Reviews PRs against the same conventions as Claude, posts inline findings, answers `@codex-niteo` questions, and approves when its threads are resolved. Use a GitHub App installation token as `github_token`; the default bot name is `codex-niteo` (override with `bot_name`). The App needs Contents: read, Pull requests: write, Issues: write, and Commit statuses: write. Optional inputs: `rules` (default: `conventions backend frontend alembic`) and `model` (default: `gpt-6-sol`).
 
-Use a trusted private runner with Codex configured, `gh`, Python, and an
-unprivileged user without passwordless sudo. Pass its persistent directory as
-`codex_home` and use the runner-provided `codex` executable on `PATH`.
-The container provides isolation; Codex's inner sandbox is disabled.
-GitHub tokens are withheld from Codex and used by a separate publishing step.
-Confirmed authentication failures create `auth-required` in `codex_home` for
-the runner administrator to disable Codex eligibility until re-login.
+Use a trusted private runner with Codex configured, `gh`, Python, and an unprivileged user without passwordless sudo. Pass its persistent directory as `codex_home` and use the runner-provided `codex` executable on `PATH`. The container provides isolation; Codex's inner sandbox is disabled. GitHub tokens are withheld from Codex and used by a separate publishing step. Confirmed authentication failures create `auth-required` in `codex_home` for the runner administrator to disable Codex eligibility until re-login.
 
-Run Claude first so Codex sees its findings. Both agents check existing threads
-for the same cause and fix to reduce duplicates. Per-PR concurrency serializes
-the pair; different PRs can run concurrently on separate runners.
-Replace separate review workflows with this example:
+Run Claude first so Codex sees its findings. Both agents check existing threads for the same cause and fix to reduce duplicates. Per-PR concurrency serializes the pair; different PRs can run concurrently on separate runners. Replace separate review workflows with this example:
 
 ```yaml
 name: AI review
@@ -286,15 +280,7 @@ jobs:
           codex_home: /var/lib/codex-review
 ```
 
-Each reviewer approves only after its own threads are resolved and a follow-up
-review finds nothing new. Resolving a thread does not trigger GitHub Actions:
-after resolving the reviewer's last thread, post a new PR comment (for example,
-`Resolved all threads`) or submit a review to trigger that follow-up without a
-new commit. Both reviewers use the same policy. Drafts never trigger reviews or answers.
-Already-approved commits and reviewed commits with unresolved threads skip
-reviewing, but mentions still get answers. Comments can also start a review of
-a commit the bot has not reviewed yet.
-The example restricts triggers to trusted collaborators.
+Each reviewer approves only after its own threads are resolved and a follow-up review finds nothing new. Resolving a thread does not trigger GitHub Actions: after resolving the reviewer's last thread, post a new PR comment (for example, `Resolved all threads`) or submit a review to trigger that follow-up without a new commit. Both reviewers use the same policy. Drafts never trigger reviews or answers. Already-approved commits and reviewed commits with unresolved threads skip reviewing, but mentions still get answers. Comments can also start a review of a commit the bot has not reviewed yet. The example restricts triggers to trusted collaborators.
 
 ## We're hiring!
 
