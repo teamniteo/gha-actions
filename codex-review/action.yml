@@ -12,7 +12,7 @@ inputs:
     required: true
   model:
     description: Codex model to use for reviews.
-    default: "gpt-6.1-sol"
+    default: "gpt-6-sol"
   rules:
     description: Rules from teamniteo/claude to review against.
     default: "conventions backend frontend alembic"
