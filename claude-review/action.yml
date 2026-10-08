@@ -37,7 +37,9 @@ runs:
         STATUS: claude-review
         RULES: ${{ inputs.rules }}
         ACTION_PATH: ${{ github.action_path }}
-      run: bash "$ACTION_PATH/../review-context/prepare.sh"
+      run: |
+        rm -f "$RUNNER_TEMP/review-usage-claude/usage.json"
+        bash "$ACTION_PATH/../review-context/prepare.sh"
 
     # CLAUDE_CODE_SUBPROCESS_ENV_SCRUB refuses to run without bubblewrap,
     # which claude-code-action only installs for allowed_non_write_users.
@@ -52,7 +54,8 @@ runs:
           sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
         fi
 
-    - uses: anthropics/claude-code-action@86d88e619d8e6caf07b5c3944dd14f441c533718 # v1.0.243
+    - id: claude
+      uses: anthropics/claude-code-action@86d88e619d8e6caf07b5c3944dd14f441c533718 # v1.0.243
       if: steps.check.outputs.run == 'true'
       env:
         # Keep the OAuth token out of the shell commands Claude runs.
@@ -103,3 +106,22 @@ runs:
       run: |
         gh api -X POST "repos/${{ github.repository }}/statuses/${{ steps.check.outputs.head }}" \
           -f state=success -f context=claude-review -f description="Reviewed by Claude" >/dev/null
+
+    - name: Record review token usage
+      if: always() && steps.check.outputs.run == 'true'
+      continue-on-error: true
+      shell: bash
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+        SOURCE: ${{ steps.claude.outputs.execution_file }}
+      run: >-
+        python3 "$ACTION_PATH/../review-usage/collect.py" claude "$SOURCE" "$RUNNER_TEMP/review-usage-claude/usage.json"
+    - name: Upload review token usage
+      if: always() && steps.check.outputs.run == 'true'
+      continue-on-error: true
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        name: ai-review-usage-claude-${{ github.job }}-${{ github.run_attempt }}
+        path: ${{ runner.temp }}/review-usage-claude/usage.json
+        if-no-files-found: ignore
+        retention-days: 14

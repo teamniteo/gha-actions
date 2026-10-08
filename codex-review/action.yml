@@ -35,7 +35,10 @@ runs:
         STATUS: codex-review
         RULES: ${{ inputs.rules }}
         ACTION_PATH: ${{ github.action_path }}
-      run: bash "$ACTION_PATH/../review-context/prepare.sh"
+      run: |
+        rm -f "$RUNNER_TEMP/review-usage-codex/usage.json"
+        rm -f "$RUNNER_TEMP/codex-review-events.jsonl"
+        bash "$ACTION_PATH/../review-context/prepare.sh"
 
     - name: Collect the diff
       if: steps.check.outputs.run == 'true'
@@ -52,6 +55,7 @@ runs:
       env:
         CODEX_HOME: ${{ inputs.codex_home }}
         MODEL: ${{ inputs.model }}
+        EVENTS: ${{ runner.temp }}/codex-review-events.jsonl
         ACTION_PATH: ${{ github.action_path }}
         SCHEMA: ${{ github.action_path }}/schema.json
         RESULT: ${{ runner.temp }}/codex-review-result.json
@@ -82,12 +86,12 @@ runs:
           echo "Run Codex as an unprivileged user without passwordless sudo" >&2
           exit 1
         fi
-        args=(exec --dangerously-bypass-approvals-and-sandbox
+        args=(exec --json --dangerously-bypass-approvals-and-sandbox
               --output-schema "$SCHEMA" --output-last-message "$RESULT")
         if [ -n "$MODEL" ]; then
           args+=(--model "$MODEL")
         fi
-        python3 "$ACTION_PATH/run.py" "${args[@]}" - <<< "$PROMPT"
+        python3 "$ACTION_PATH/run.py" "${args[@]}" - <<< "$PROMPT" > "$EVENTS"
 
     - name: Publish Codex's review
       if: steps.check.outputs.run == 'true'
@@ -103,3 +107,23 @@ runs:
         RESULT: ${{ runner.temp }}/codex-review-result.json
         ACTION_PATH: ${{ github.action_path }}
       run: python3 "$ACTION_PATH/publish.py"
+
+    - name: Record review token usage
+      if: always() && steps.check.outputs.run == 'true'
+      continue-on-error: true
+      shell: bash
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+        SOURCE: ${{ runner.temp }}/codex-review-events.jsonl
+        MODEL: ${{ inputs.model }}
+      run: >-
+        python3 "$ACTION_PATH/../review-usage/collect.py" codex "$SOURCE" "$RUNNER_TEMP/review-usage-codex/usage.json" --model "$MODEL"
+    - name: Upload review token usage
+      if: always() && steps.check.outputs.run == 'true'
+      continue-on-error: true
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        name: ai-review-usage-codex-${{ github.job }}-${{ github.run_attempt }}
+        path: ${{ runner.temp }}/review-usage-codex/usage.json
+        if-no-files-found: ignore
+        retention-days: 14
