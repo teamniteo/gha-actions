@@ -59,19 +59,9 @@ elif [ "$reviewed" -gt 0 ] && [ "$open" -gt 0 ]; then
   skip="already reviewed $head and $open threads are unresolved"
 fi
 mode=review
-case "$EVENT" in
-  issue_comment|pull_request_review_comment)
-    # A reviewed commit with no remaining threads needs a follow-up review
-    # before approval. Resolution itself does not trigger GitHub Actions, so
-    # let the next comment pick it up. Preserve draft/approval/open-thread skips.
-    if [ "$reviewed" -eq 0 ]; then
-      skip="comment events answer questions only"
-    fi
-    ;;
-esac
 if [ -n "$skip" ]; then
   mode=skip
-  if [ "$asked" -gt 0 ] || grep -qiE "$MENTION([^a-zA-Z0-9_-]|$)" <<< "$COMMENT"; then
+  if [ "$draft" != true ] && { [ "$asked" -gt 0 ] || grep -qiE "$MENTION([^a-zA-Z0-9_-]|$)" <<< "$COMMENT"; }; then
     mode=answer
   fi
 fi

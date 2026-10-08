@@ -154,7 +154,7 @@ Claude reviews against the project's conventions: the `rules` (default `conventi
 
 Mention `@claude` in a comment, review or review thread to ask it something: it answers in the thread, or with a comment, even when there is nothing new to review.
 
-Run it on every pull request event. A check before Claude starts skips drafts, commits Claude already approved, and commits it already reviewed while its threads are still open, so most events take seconds. A comment that mentions `@claude` runs it anyway, to answer. A `claude-review` commit status marks each commit Claude has reviewed. Resolving a thread does not trigger workflows: the next push, comment or review picks it up.
+Run it on every pull request event. A check before Claude starts skips drafts, commits Claude already approved, and commits it already reviewed while its threads are still open, so most events take seconds. On non-draft PRs, a comment that mentions `@claude` runs it anyway, to answer. Drafts never trigger reviews or answers. A `claude-review` commit status marks each commit Claude has reviewed. Resolving a thread does not trigger workflows: the next push, comment or review picks it up.
 
 The repository needs the [Claude GitHub App](https://github.com/apps/claude) installed and a `CLAUDE_CODE_OAUTH_TOKEN` secret from `claude setup-token`. Use GitHub-hosted runners: Claude's shell commands run in bubblewrap, which our NixOS runners do not allow. 
 
@@ -290,9 +290,10 @@ Each reviewer approves only after its own threads are resolved and a follow-up
 review finds nothing new. Resolving a thread does not trigger GitHub Actions:
 after resolving the reviewer's last thread, post a new PR comment (for example,
 `Resolved all threads`) or submit a review to trigger that follow-up without a
-new commit. Both reviewers use the same policy. Drafts, already-approved commits,
-and reviewed commits with unresolved threads are skipped, but mentions still
-get answers. Comments on commits the bot has not reviewed only answer mentions.
+new commit. Both reviewers use the same policy. Drafts never trigger reviews or answers.
+Already-approved commits and reviewed commits with unresolved threads skip
+reviewing, but mentions still get answers. Comments can also start a review of
+a commit the bot has not reviewed yet.
 The example restricts triggers to trusted collaborators.
 
 ## We're hiring!
