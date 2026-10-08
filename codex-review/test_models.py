@@ -30,7 +30,7 @@ class ModelTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             executable=Path(directory)/'codex'
             executable.write_text(f'#!{sys.executable}\n'+'''import json, sys
-assert sys.argv[1:] == ['app-server']
+assert sys.argv[1:] == ['app-server', '-c', 'sandbox_mode="danger-full-access"']
 for line in sys.stdin:
     msg=json.loads(line)
     if msg['method']=='initialized': continue

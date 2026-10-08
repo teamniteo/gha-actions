@@ -21,7 +21,7 @@ def newest(models, family):
 def resolve(name, env):
     if name not in {"latest-sol", "latest-astra"}:
         return name
-    process = subprocess.Popen(["codex", "app-server"], env=env, stdin=subprocess.PIPE,
+    process = subprocess.Popen(["codex", "app-server", "-c", 'sandbox_mode="danger-full-access"'], env=env, stdin=subprocess.PIPE,
                                stdout=subprocess.PIPE, text=True)
     timer = threading.Timer(30, process.kill)
     timer.start()
