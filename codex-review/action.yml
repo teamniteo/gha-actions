@@ -11,8 +11,8 @@ inputs:
     description: Absolute persistent Codex home configured by the runner administrator.
     required: true
   model:
-    description: Codex model to use for reviews.
-    default: "gpt-6-sol"
+    description: Explicit Codex model ID, latest-sol, or latest-astra.
+    default: "latest-sol"
   rules:
     description: Rules from teamniteo/claude to review against.
     default: "conventions backend frontend alembic"

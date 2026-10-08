@@ -6,6 +6,8 @@ import re
 import subprocess
 import sys
 
+from models import resolve
+
 AUTH_FAILURE = re.compile(
     r"Your access token could not be refreshed because your refresh token "
     r"(?:has expired|was already used|was revoked)|"
@@ -23,7 +25,13 @@ def main():
         return 1
     # Tokens used for publishing must never reach Codex or its child processes.
     env = {key: value for key, value in os.environ.items() if key not in {"GH_TOKEN", "GITHUB_TOKEN"}}
-    process = subprocess.Popen(["codex", *sys.argv[1:]], env=env, stderr=subprocess.PIPE,
+    args = sys.argv[1:]
+    if "--model" in args:
+        index = args.index("--model") + 1
+        requested = args[index]
+        args[index] = resolve(requested, env)
+        print(f"Codex model: {requested} -> {args[index]}", file=sys.stderr)
+    process = subprocess.Popen(["codex", *args], env=env, stderr=subprocess.PIPE,
                                text=True, errors="replace")
     auth_failed = False
     for line in process.stderr:
