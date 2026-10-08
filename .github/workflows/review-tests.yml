@@ -1,0 +1,31 @@
+name: Review action tests
+
+on:
+  pull_request:
+    paths:
+      - 'claude-review/**'
+      - 'codex-review/**'
+      - 'review-context/**'
+      - '.github/workflows/review-tests.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'claude-review/**'
+      - 'codex-review/**'
+      - 'review-context/**'
+      - '.github/workflows/review-tests.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+      - name: Test review policy, model discovery, auth handling, and publishing
+        run: |
+          python3 -B -m unittest discover -s review-context -v
+          python3 -B -m unittest discover -s codex-review -v
+          bash -n review-context/prepare.sh
