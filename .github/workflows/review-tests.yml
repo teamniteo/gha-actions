@@ -24,7 +24,7 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v6
-      - name: Test review policy, model discovery, auth handling, and publishing
+      - name: Test review policy, auth handling, and publishing
         run: |
           python3 -B -m unittest discover -s review-context -v
           python3 -B -m unittest discover -s codex-review -v
