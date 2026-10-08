@@ -212,7 +212,7 @@ Enable GitHub Actions PR approvals in repository settings.
 
 Run Claude first so Codex sees its findings. Both agents check existing threads
 for the same cause and fix to reduce duplicates. Per-PR concurrency serializes
-the pair; the runner wrapper serializes Codex invocations across slots.
+the pair; different PRs can run concurrently on separate runners.
 Replace separate review workflows with this example:
 
 ```yaml
