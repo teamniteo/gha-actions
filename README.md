@@ -209,6 +209,8 @@ unprivileged user without passwordless sudo. Pass its persistent directory as
 The container provides isolation; Codex's inner sandbox is disabled.
 GitHub tokens are withheld from Codex and used by a separate publishing step.
 Enable GitHub Actions PR approvals in repository settings.
+Confirmed authentication failures create `auth-required` in `codex_home` for
+the runner administrator to disable Codex eligibility until re-login.
 
 Run Claude first so Codex sees its findings. Both agents check existing threads
 for the same cause and fix to reduce duplicates. Per-PR concurrency serializes

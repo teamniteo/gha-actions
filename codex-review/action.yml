@@ -46,6 +46,7 @@ runs:
       env:
         CODEX_HOME: ${{ inputs.codex_home }}
         MODEL: ${{ inputs.model }}
+        ACTION_PATH: ${{ github.action_path }}
         SCHEMA: ${{ github.action_path }}/schema.json
         RESULT: ${{ runner.temp }}/codex-review-result.json
         PROMPT: |
@@ -80,7 +81,7 @@ runs:
         if [ -n "$MODEL" ]; then
           args+=(--model "$MODEL")
         fi
-        env -u GH_TOKEN -u GITHUB_TOKEN codex "${args[@]}" - <<< "$PROMPT"
+        python3 "$ACTION_PATH/run.py" "${args[@]}" - <<< "$PROMPT"
 
     - name: Publish Codex's review
       if: steps.check.outputs.run == 'true'
