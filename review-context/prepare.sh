@@ -61,7 +61,12 @@ fi
 mode=review
 case "$EVENT" in
   issue_comment|pull_request_review_comment)
-    skip="comment events answer questions only"
+    # A reviewed commit with no remaining threads needs a follow-up review
+    # before approval. Resolution itself does not trigger GitHub Actions, so
+    # let the next comment pick it up. Preserve draft/approval/open-thread skips.
+    if [ "$reviewed" -eq 0 ]; then
+      skip="comment events answer questions only"
+    fi
     ;;
 esac
 if [ -n "$skip" ]; then

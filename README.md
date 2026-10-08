@@ -286,8 +286,14 @@ jobs:
           codex_home: /var/lib/codex-review
 ```
 
-Each reviewer approves only after its own threads are resolved. Drafts and
-reviewed commits are skipped. Comment events only answer mentions; they do not start a full review. The example restricts triggers to trusted collaborators.
+Each reviewer approves only after its own threads are resolved and a follow-up
+review finds nothing new. Resolving a thread does not trigger GitHub Actions:
+after resolving the reviewer's last thread, post a new PR comment (for example,
+`Resolved all threads`) or submit a review to trigger that follow-up without a
+new commit. Both reviewers use the same policy. Drafts, already-approved commits,
+and reviewed commits with unresolved threads are skipped, but mentions still
+get answers. Comments on commits the bot has not reviewed only answer mentions.
+The example restricts triggers to trusted collaborators.
 
 ## We're hiring!
 
