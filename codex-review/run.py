@@ -1,5 +1,6 @@
 """Run Codex, recording confirmed authentication failures for the runner host."""
 
+import json
 import os
 from pathlib import Path
 import re
@@ -30,6 +31,24 @@ def main():
         sys.stderr.write(line)
         auth_failed |= bool(AUTH_FAILURE.search(line))
     code = process.wait()
+    if code != 0 and os.environ.get("EVENTS"):
+        try:
+            with Path(os.environ["EVENTS"]).open() as events:
+                for line in events:
+                    try:
+                        event = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    message = ""
+                    if event.get("type") == "error":
+                        message = event.get("message", "")
+                    elif event.get("type") == "turn.failed":
+                        message = event.get("error", {}).get("message", "")
+                    if message:
+                        print(message, file=sys.stderr)
+                        auth_failed |= bool(AUTH_FAILURE.search(message))
+        except OSError:
+            pass
     if code != 0 and auth_failed:
         flag.touch(mode=0o600)
         print("Codex authentication failed; this slot needs re-login. Ordinary CI remains available.",
