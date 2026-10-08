@@ -2,6 +2,7 @@
 set -euo pipefail
 
 mkdir -p "$CONTEXT/rules"
+cp "$(dirname "${BASH_SOURCE[0]}")/prompt.md" "$CONTEXT/prompt.md"
 gh pr view "$PR" --json title,body,comments,reviews > "$CONTEXT/pr.json"
 gh api graphql --paginate \
   -F owner="${REPO%%/*}" \

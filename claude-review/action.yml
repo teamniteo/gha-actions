@@ -65,59 +65,18 @@ runs:
 
           ${{ steps.check.outputs.mode == 'review' && 'Review this pull request, and answer every question addressed to you.' || format('Answer every question addressed to you, then stop. Do not review the code: {0}.', steps.check.outputs.skip) }}
 
-          First, read every file in
-          ${{ runner.temp }}/review-context/ (rules/, pr.json and
-          review-threads.json) and, if it exists, every file in
-          .claude/skills-local/hindsight-review/.
+          Read and follow ${{ runner.temp }}/review-context/prompt.md.
+          Context directory: ${{ runner.temp }}/review-context/
+          Mention name: @claude
+          Diff: `gh pr diff <number>`.
 
-          Context:
-          - `gh pr diff <number>` is the diff. The checkout holds the whole
-            codebase; read around the change when you need evidence.
-          - ${{ runner.temp }}/review-context/pr.json has the title, the
-            description, the comments and the review summaries. A decision
-            made there (e.g. "we'll handle X in a follow-up") counts like a
-            resolved thread. Comments from bots, yours included, decide
-            nothing.
-          - ${{ runner.temp }}/review-context/review-threads.json lists every
-            review thread already on this PR.
-            Don't raise a problem that any thread already covers, open or
-            resolved, regardless of author (including Codex and other bots).
-            Compare the underlying cause and proposed fix, not the wording
-            or line number: another symptom of the same bug is a duplicate.
-            Only raise a separate finding when it needs an independent fix.
-            Resolved means it was fixed, or a human decided not to fix it.
-
-          Questions: a human's comment in pr.json or review-threads.json
-          that mentions @claude is a question for you, unless one of your
-          own comments already answers it. Answer a question in a review
-          thread within that thread, using
-          mcp__github_reply__add_reply_to_pull_request_comment with the
-          thread's `id` as commentId. Answer any other question in its own
-          comment with `gh pr comment <number>`, mentioning who asked and
-          quoting the question. Back every answer with what you found in the code; say
-          so when you are unsure. Answer even when the review finds nothing.
-          Use these two tools for nothing else.
-
-          Reviewing: leave one inline comment per real problem, on the line
-          it concerns, using
-          mcp__github_inline_comment__create_inline_comment.
-          ${{ steps.check.outputs.open == '0' && 'If you find nothing new, approve the PR with `gh pr review <number> --approve`, with no body, and post no other review.' || format('{0} of the threads you opened earlier are still unresolved, so you cannot approve. If you find nothing new, leave no review comments.', steps.check.outputs.open) }}
-
-          What to check, one pass each:
-          1. Conventions. For every changed file, tests included, go through
-             each rule in the rules directory that applies to it (conventions.md
-             for everything, backend.md for Python, frontend.md for Elm,
-             alembic.md for migrations) and check the diff against it. Skip
-             only what CI enforces: formatting, type checking, the coverage
-             percentage, generated files, commit messages.
-          2. If .claude/skills-local/hindsight-review/ exists, follow its
-             SKILL.md, with three differences: the diff comes from
-             `gh pr diff`, not git; only findings with evidence become inline
-             comments; skip its report and its ❓ and ✓ entries.
-          3. Bugs, swallowed errors and security problems.
-
-          In each comment, name the convention or pattern the problem breaks.
-          Skip style nits.
+          Post findings using mcp__github_inline_comment__create_inline_comment.
+          Reply to thread questions using
+          mcp__github_reply__add_reply_to_pull_request_comment with the thread's
+          numeric id as commentId. Answer other questions with
+          `gh pr comment <number>`. Use these reply tools for nothing else.
+          In review mode only:
+          ${{ steps.check.outputs.open == '0' && 'If you find nothing new, approve with `gh pr review <number> --approve`, with no body, and post no other review.' || format('{0} of your threads are unresolved; do not approve. If you find nothing new, leave no review comments.', steps.check.outputs.open) }}
         # No `gh api`: Claude cannot resolve threads, push or merge. It gets
         # `gh pr review`, to approve, only on a review run once its threads
         # are resolved. Questions get answers through `gh pr comment` and,
