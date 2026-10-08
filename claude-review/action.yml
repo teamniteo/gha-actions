@@ -21,98 +21,23 @@ runs:
     # which Claude must not get (it could also resolve threads, approve and
     # merge). Not into .claude/: claude-code-action resets that to the base
     # branch.
-    - name: Collect the PR's discussion and review threads
-      shell: bash
-      env:
-        GH_TOKEN: ${{ github.token }}
-        PR: ${{ github.event.pull_request.number || github.event.issue.number }}
-        CONTEXT: ${{ runner.temp }}/review-context
-      run: |
-        mkdir -p "$CONTEXT/rules"
-        gh pr view "$PR" --json title,body,comments,reviews > "$CONTEXT/pr.json"
-        gh api graphql --paginate \
-          -F owner='${{ github.repository_owner }}' \
-          -F name='${{ github.event.repository.name }}' \
-          -F pr="$PR" \
-          -f query='
-            query($owner: String!, $name: String!, $pr: Int!, $endCursor: String) {
-              repository(owner: $owner, name: $name) {
-                pullRequest(number: $pr) {
-                  reviewThreads(first: 100, after: $endCursor) {
-                    pageInfo { hasNextPage endCursor }
-                    nodes {
-                      isResolved
-                      resolvedBy { login }
-                      path
-                      line
-                      comments(first: 20) { nodes { databaseId author { login } body createdAt } }
-                    }
-                  }
-                }
-              }
-            }' \
-          --jq '[.data.repository.pullRequest.reviewThreads.nodes[]
-                 | {id: .comments.nodes[0].databaseId,
-                    resolved: .isResolved, resolved_by: .resolvedBy.login, path, line,
-                    comments: [.comments.nodes[] | {author: .author.login, body, at: .createdAt}]}]' \
-          | jq -s 'add // []' > "$CONTEXT/review-threads.json"
-
-    # Every PR event lands here, so most runs have nothing to do. Claude may
-    # approve only once every thread it opened is resolved; until then it
-    # doesn't get `gh pr review` at all, whatever the diff says. A comment
-    # that mentions @claude always gets an answer, review or not.
-    - name: Decide whether Claude has anything to do
+    - name: Prepare review context and choose mode
       id: check
       shell: bash
       env:
         GH_TOKEN: ${{ github.token }}
         PR: ${{ github.event.pull_request.number || github.event.issue.number }}
+        REPO: ${{ github.repository }}
         CONTEXT: ${{ runner.temp }}/review-context
         COMMENT: ${{ github.event.comment.body || github.event.review.body }}
-      run: |
-        read -r draft head < <(gh pr view "$PR" --json isDraft,headRefOid --jq '"\(.isDraft) \(.headRefOid)"')
-        open=$(jq '[.[] | select(.comments[0].author == "claude" and (.resolved | not))] | length' \
-          "$CONTEXT/review-threads.json")
-        approved=$(gh api "repos/${{ github.repository }}/pulls/$PR/reviews?per_page=100" \
-          --jq "[.[] | select(.user.login == \"claude[bot]\" and .state == \"APPROVED\" and .commit_id == \"$head\")] | length")
-        reviewed=$(gh api "repos/${{ github.repository }}/commits/$head/status" \
-          --jq '[.statuses[] | select(.context == "claude-review")] | length')
-        # Mentions of @claude since its last answer: a comment of its own
-        # that doesn't open a review thread. Read from the PR as well as the
-        # triggering comment, since a waiting run is replaced by the next
-        # event's, and a thread reply fires a review event alongside.
-        asked=$(jq -s '
-          [(.[0].comments[] | {who: .author.login, body, at: .createdAt, answer: true}),
-           (.[0].reviews[] | {who: .author.login, body, at: .submittedAt, answer: false}),
-           (.[1][].comments | to_entries[] | .value + {who: .value.author, answer: (.key > 0)})]
-          | (map(select(.who == "claude" and .answer) | .at) | max // "") as $answered
-          | map(select(.who != "claude" and .at > $answered
-                       and ((.body // "") | test("@claude\\b"; "i"))))
-          | length' "$CONTEXT/pr.json" "$CONTEXT/review-threads.json")
-
-        # An approval lands on whatever the head is when Claude approves,
-        # possibly a commit pushed mid-review; the status says what it read.
-        if [ "$draft" = true ]; then
-          skip="the PR is a draft"
-        elif [ "$approved" -gt 0 ] && [ "$reviewed" -gt 0 ]; then
-          skip="Claude already approved $head"
-        elif [ "$reviewed" -gt 0 ] && [ "$open" -gt 0 ]; then
-          skip="Claude already reviewed $head and $open of its threads are unresolved"
-        fi
-
-        echo "head=$head" >> "$GITHUB_OUTPUT"
-        echo "open=$open" >> "$GITHUB_OUTPUT"
-        echo "skip=${skip:-}" >> "$GITHUB_OUTPUT"
-        if [ -z "${skip:-}" ]; then
-          echo "Reviewing $head; Claude's unresolved threads: $open"
-          echo "run=true" >> "$GITHUB_OUTPUT"
-        elif [ "$asked" -gt 0 ] || grep -qiE '@claude\b' <<< "$COMMENT"; then
-          echo "Not reviewing, $skip; answering questions"
-          echo "run=true" >> "$GITHUB_OUTPUT"
-        else
-          echo "Skipping: $skip"
-          echo "run=false" >> "$GITHUB_OUTPUT"
-        fi
+        EVENT: ${{ github.event_name }}
+        AUTHOR: claude
+        MENTION: "@claude"
+        MARKER: ""
+        STATUS: claude-review
+        RULES: ${{ inputs.rules }}
+        ACTION_PATH: ${{ github.action_path }}
+      run: bash "$ACTION_PATH/../review-context/prepare.sh"
 
     # CLAUDE_CODE_SUBPROCESS_ENV_SCRUB refuses to run without bubblewrap,
     # which claude-code-action only installs for allowed_non_write_users.
@@ -127,22 +52,6 @@ runs:
           sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
         fi
 
-    # The dev shell links these from teamniteo/claude; a CI checkout has none.
-    # Fetch them at the revision the project pins, or main if it pins none.
-    - name: Fetch conventions
-      if: steps.check.outputs.run == 'true'
-      shell: bash
-      env:
-        RULES: ${{ inputs.rules }}
-        CONTEXT: ${{ runner.temp }}/review-context
-      run: |
-        rev=$(jq -r '.nodes["niteo-claude"].locked.rev // "main"' nix/flake.lock 2>/dev/null || echo main)
-        echo "teamniteo/claude@$rev: $RULES"
-        for rule in $RULES; do
-          curl -fsSL -o "$CONTEXT/rules/$rule.md" \
-            "https://raw.githubusercontent.com/teamniteo/claude/$rev/rules/$rule.md"
-        done
-
     - uses: anthropics/claude-code-action@86d88e619d8e6caf07b5c3944dd14f441c533718 # v1.0.243
       if: steps.check.outputs.run == 'true'
       env:
@@ -154,7 +63,7 @@ runs:
           REPO: ${{ github.repository }}
           PR NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
 
-          ${{ steps.check.outputs.skip == '' && 'Review this pull request, and answer every question addressed to you.' || format('Answer every question addressed to you, then stop. Do not review the code: {0}.', steps.check.outputs.skip) }}
+          ${{ steps.check.outputs.mode == 'review' && 'Review this pull request, and answer every question addressed to you.' || format('Answer every question addressed to you, then stop. Do not review the code: {0}.', steps.check.outputs.skip) }}
 
           First, read every file in
           ${{ runner.temp }}/review-context/ (rules/, pr.json and
@@ -223,12 +132,12 @@ runs:
           "ghcr.io/github/github-mcp-server:v2.0.1@sha256:03f565ea952662cd14a8a0373d910aeced3aff7197ab6afef786755db8d25994",
           "stdio", "--tools", "add_reply_to_pull_request_comment"],
           "env": {"GITHUB_PERSONAL_ACCESS_TOKEN": "${GH_TOKEN}"}}}}'
-          --allowedTools "mcp__github_inline_comment__create_inline_comment,mcp__github_reply__add_reply_to_pull_request_comment,Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr comment:*),Read,Glob,Grep${{ steps.check.outputs.skip == '' && steps.check.outputs.open == '0' && ',Bash(gh pr review:*)' || '' }}"
+          --allowedTools "mcp__github_inline_comment__create_inline_comment,mcp__github_reply__add_reply_to_pull_request_comment,Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr comment:*),Read,Glob,Grep${{ steps.check.outputs.mode == 'review' && steps.check.outputs.open == '0' && ',Bash(gh pr review:*)' || '' }}"
 
     # Lets the next event skip this commit while Claude's threads stay open,
     # and shows on the PR which commit Claude last looked at.
     - name: Mark the commit as reviewed
-      if: steps.check.outputs.run == 'true' && steps.check.outputs.skip == ''
+      if: steps.check.outputs.run == 'true' && steps.check.outputs.mode == 'review'
       shell: bash
       env:
         GH_TOKEN: ${{ github.token }}

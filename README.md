@@ -277,7 +277,7 @@ jobs:
 ```
 
 Each reviewer approves only after its own threads are resolved. Drafts and
-reviewed commits are skipped; mentions still get answers. Triggers below are
+reviewed commits are skipped. Comment events only answer mentions; they do not start a full review. Triggers below are
 restricted to trusted collaborators.
 
 ## We're hiring!
