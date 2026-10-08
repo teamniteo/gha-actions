@@ -1,0 +1,105 @@
+name: "Codex review"
+description: Review a pull request with Codex, answering questions and approving after its threads are resolved.
+inputs:
+  github_token:
+    description: GitHub App installation token used to read context and publish reviews.
+    required: true
+  bot_name:
+    description: GitHub App bot name, without the [bot] suffix.
+    default: "codex-niteo"
+  codex_home:
+    description: Absolute persistent Codex home configured by the runner administrator.
+    required: true
+  model:
+    description: Codex model ID to use for reviews.
+    default: "gpt-6-sol"
+  rules:
+    description: Rules from teamniteo/claude to review against.
+    default: "conventions backend frontend alembic"
+runs:
+  using: composite
+  steps:
+    - name: Prepare review context and choose mode
+      id: check
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github_token }}
+        PR: ${{ github.event.pull_request.number || github.event.issue.number }}
+        REPO: ${{ github.repository }}
+        CONTEXT: ${{ runner.temp }}/codex-review-context
+        COMMENT: ${{ github.event.comment.body || github.event.review.body }}
+        EVENT: ${{ github.event_name }}
+        AUTHOR: ${{ inputs.bot_name }}
+        MENTION: "@${{ inputs.bot_name }}"
+        MARKER: "<!-- codex-review -->"
+        STATUS: codex-review
+        RULES: ${{ inputs.rules }}
+        ACTION_PATH: ${{ github.action_path }}
+      run: bash "$ACTION_PATH/../review-context/prepare.sh"
+
+    - name: Collect the diff
+      if: steps.check.outputs.run == 'true'
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github_token }}
+        PR: ${{ github.event.pull_request.number || github.event.issue.number }}
+        CONTEXT: ${{ runner.temp }}/codex-review-context
+      run: gh pr diff "$PR" > "$CONTEXT/diff.patch"
+
+    - name: Review with Codex
+      if: steps.check.outputs.run == 'true'
+      shell: bash
+      env:
+        CODEX_HOME: ${{ inputs.codex_home }}
+        MODEL: ${{ inputs.model }}
+        ACTION_PATH: ${{ github.action_path }}
+        SCHEMA: ${{ github.action_path }}/schema.json
+        RESULT: ${{ runner.temp }}/codex-review-result.json
+        PROMPT: |
+          Review PR ${{ github.event.pull_request.number || github.event.issue.number }} in ${{ github.repository }}.
+          Review mode: ${{ steps.check.outputs.mode == 'review' && 'Review the code and answer questions.' || format('Answer questions only. Do not review: {0}', steps.check.outputs.skip) }}
+          Read and follow ${{ runner.temp }}/codex-review-context/prompt.md.
+          Context directory: ${{ runner.temp }}/codex-review-context/
+          Mention name: @${{ inputs.bot_name }}
+          Diff: diff.patch in the context directory.
+          Do not execute project code, change files or contact GitHub.
+
+          Return findings and answers in the JSON schema. Each finding must
+          target a changed line on the RIGHT side of diff.patch, with a
+          repository-relative path. For thread answers use the thread's numeric
+          id as comment_id; for other answers use comment_id 0.
+          Set complete true only if you completed every required check, or, in
+          questions-only mode, answered the questions. If unable to finish, set
+          complete false; never claim a clean review from missing context.
+      run: |
+        set -euo pipefail
+        if [[ "$CODEX_HOME" != /* ]] || [ ! -d "$CODEX_HOME" ]; then
+          echo "codex_home must be an absolute persistent directory configured by the runner administrator" >&2
+          exit 1
+        fi
+        # A read-only agent must not be able to escape via passwordless sudo.
+        if [ "$(id -u)" = 0 ] || sudo -n true 2>/dev/null; then
+          echo "Run Codex as an unprivileged user without passwordless sudo" >&2
+          exit 1
+        fi
+        args=(exec --dangerously-bypass-approvals-and-sandbox
+              --output-schema "$SCHEMA" --output-last-message "$RESULT")
+        if [ -n "$MODEL" ]; then
+          args+=(--model "$MODEL")
+        fi
+        python3 "$ACTION_PATH/run.py" "${args[@]}" - <<< "$PROMPT"
+
+    - name: Publish Codex's review
+      if: steps.check.outputs.run == 'true'
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github_token }}
+        PR: ${{ github.event.pull_request.number || github.event.issue.number }}
+        REPO: ${{ github.repository }}
+        HEAD: ${{ steps.check.outputs.head }}
+        AUTHOR: ${{ inputs.bot_name }}
+        SKIP: ${{ steps.check.outputs.skip }}
+        CONTEXT: ${{ runner.temp }}/codex-review-context
+        RESULT: ${{ runner.temp }}/codex-review-result.json
+        ACTION_PATH: ${{ github.action_path }}
+      run: python3 "$ACTION_PATH/publish.py"
