@@ -40,7 +40,7 @@ else: print(json.dumps(dict(statuses=[dict(context='test-review')] if f['reviewe
             env = dict(os.environ, PATH=f'{root}:{os.environ["PATH"]}',
                        FIXTURE=str(root/'fixture.json'), CONTEXT=str(root/'context'),
                        PR='1', REPO='owner/repo', AUTHOR=author, MARKER=marker,
-                       STATUS='test-review', MENTION='@claude', EVENT=event,
+                       STATUS='test-review', MENTION='@'+author, EVENT=event,
                        COMMENT=comment, RULES='conventions', GITHUB_OUTPUT=str(output))
             subprocess.run(['bash', str(SCRIPT)], env=env, cwd=root,
                            check=True, capture_output=True, text=True)
@@ -64,6 +64,18 @@ else: print(json.dumps(dict(statuses=[dict(context='test-review')] if f['reviewe
     def test_draft_skips_but_answers_mentions(self):
         self.assertEqual(self.prepare(draft=True)['mode'], 'skip')
         self.assertEqual(self.prepare(draft=True, comment='@claude why?')['mode'], 'answer')
+
+    def test_codex_app_mention_answers_without_review(self):
+        result=self.prepare('issue_comment', '@codex-niteo why?', author='codex-niteo')
+        self.assertEqual(result['mode'], 'answer')
+        result=self.prepare('issue_comment', '@codex why?', author='codex-niteo')
+        self.assertEqual(result['mode'], 'skip')
+
+    def test_bot_suffix_does_not_hide_open_threads(self):
+        threads=[dict(id=1, resolved=False, comments=[dict(author='codex-niteo[bot]', body='codex', at='2026-01-01')])]
+        result=self.prepare(reviewed=True, threads=threads, author='codex-niteo', marker='codex')
+        self.assertEqual(result['mode'], 'skip')
+        self.assertEqual(result['open'], '1')
 
     def test_marker_separates_reviewers_sharing_identity(self):
         threads=[dict(id=1, resolved=False, comments=[dict(author='github-actions', body='other', at='2026-01-01')])]

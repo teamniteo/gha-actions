@@ -12,7 +12,7 @@ import publish
 
 class PublishingTests(unittest.TestCase):
     def run_review(self, *, complete=True, findings=None, unresolved=False,
-                   changed_head=False, skip=""):
+                   changed_head=False, skip="", thread_author="codex-niteo"):
         calls = []
 
         def api(endpoint, payload=None):
@@ -23,7 +23,7 @@ class PublishingTests(unittest.TestCase):
                 return {"data": {"repository": {"pullRequest": {"reviewThreads": {
                     "pageInfo": {"hasNextPage": False},
                     "nodes": [{"isResolved": not unresolved, "comments": {"nodes": [{
-                        "author": {"login": "github-actions[bot]"}, "body": publish.MARKER,
+                        "author": {"login": thread_author}, "body": publish.MARKER,
                     }]}}],
                 }}}}}
             return {}
@@ -35,7 +35,7 @@ class PublishingTests(unittest.TestCase):
                 "complete": complete, "findings": findings or [], "answers": [],
             }))
             with patch.dict(os.environ, {
-                "REPO": "owner/repo", "PR": "1", "HEAD": "head", "SKIP": skip,
+                "AUTHOR": "codex-niteo", "REPO": "owner/repo", "PR": "1", "HEAD": "head", "SKIP": skip,
                 "CONTEXT": directory, "RESULT": str(root / "result.json"),
             }), patch.object(publish, "api", side_effect=api):
                 publish.main()
@@ -50,6 +50,14 @@ class PublishingTests(unittest.TestCase):
     def test_unresolved_thread_blocks_approval(self):
         calls = self.run_review(unresolved=True)
         self.assertFalse(any(p and p.get("event") == "APPROVE" for _, p in calls))
+
+    def test_rest_bot_suffix_also_blocks_approval(self):
+        calls = self.run_review(unresolved=True, thread_author="codex-niteo[bot]")
+        self.assertFalse(any(p and p.get("event") == "APPROVE" for _, p in calls))
+
+    def test_other_bot_thread_does_not_block_approval(self):
+        calls = self.run_review(unresolved=True, thread_author="claude")
+        self.assertTrue(any(p and p.get("event") == "APPROVE" for _, p in calls))
 
     def test_findings_are_inline_and_block_approval(self):
         calls = self.run_review(findings=[{"path": "app.py", "line": 3, "body": "Bug"}])

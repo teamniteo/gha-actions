@@ -70,7 +70,7 @@ def main():
                 if comments:
                     first = comments[0]
                     author = (first.get("author") or {}).get("login")
-                    if author == "github-actions[bot]" and MARKER in first["body"]:
+                    if (author or "").removesuffix("[bot]") == os.environ["AUTHOR"] and MARKER in first["body"]:
                         unresolved |= not thread["isResolved"]
             if not page["pageInfo"]["hasNextPage"]:
                 break

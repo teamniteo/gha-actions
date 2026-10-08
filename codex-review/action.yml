@@ -1,6 +1,12 @@
 name: "Codex review"
 description: Review a pull request with Codex, answering questions and approving after its threads are resolved.
 inputs:
+  github_token:
+    description: GitHub App installation token used to read context and publish reviews.
+    required: true
+  bot_name:
+    description: GitHub App bot name, without the [bot] suffix.
+    default: "codex-niteo"
   codex_home:
     description: Absolute persistent Codex home configured by the runner administrator.
     required: true
@@ -17,14 +23,14 @@ runs:
       id: check
       shell: bash
       env:
-        GH_TOKEN: ${{ github.token }}
+        GH_TOKEN: ${{ inputs.github_token }}
         PR: ${{ github.event.pull_request.number || github.event.issue.number }}
         REPO: ${{ github.repository }}
         CONTEXT: ${{ runner.temp }}/codex-review-context
         COMMENT: ${{ github.event.comment.body || github.event.review.body }}
         EVENT: ${{ github.event_name }}
-        AUTHOR: github-actions
-        MENTION: "@codex"
+        AUTHOR: ${{ inputs.bot_name }}
+        MENTION: "@${{ inputs.bot_name }}"
         MARKER: "<!-- codex-review -->"
         STATUS: codex-review
         RULES: ${{ inputs.rules }}
@@ -35,7 +41,7 @@ runs:
       if: steps.check.outputs.run == 'true'
       shell: bash
       env:
-        GH_TOKEN: ${{ github.token }}
+        GH_TOKEN: ${{ inputs.github_token }}
         PR: ${{ github.event.pull_request.number || github.event.issue.number }}
         CONTEXT: ${{ runner.temp }}/codex-review-context
       run: gh pr diff "$PR" > "$CONTEXT/diff.patch"
@@ -54,7 +60,7 @@ runs:
           Review mode: ${{ steps.check.outputs.mode == 'review' && 'Review the code and answer questions.' || format('Answer questions only. Do not review: {0}', steps.check.outputs.skip) }}
           Read and follow ${{ runner.temp }}/codex-review-context/prompt.md.
           Context directory: ${{ runner.temp }}/codex-review-context/
-          Mention name: @codex
+          Mention name: @${{ inputs.bot_name }}
           Diff: diff.patch in the context directory.
           Do not execute project code, change files or contact GitHub.
 
@@ -87,10 +93,11 @@ runs:
       if: steps.check.outputs.run == 'true'
       shell: bash
       env:
-        GH_TOKEN: ${{ github.token }}
+        GH_TOKEN: ${{ inputs.github_token }}
         PR: ${{ github.event.pull_request.number || github.event.issue.number }}
         REPO: ${{ github.repository }}
         HEAD: ${{ steps.check.outputs.head }}
+        AUTHOR: ${{ inputs.bot_name }}
         SKIP: ${{ steps.check.outputs.skip }}
         CONTEXT: ${{ runner.temp }}/codex-review-context
         RESULT: ${{ runner.temp }}/codex-review-result.json

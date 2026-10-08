@@ -32,7 +32,7 @@ gh api graphql --paginate \
   | jq -s 'add // []' > "$CONTEXT/review-threads.json"
 
 read -r draft head < <(gh pr view "$PR" --json isDraft,headRefOid --jq '"\(.isDraft) \(.headRefOid)"')
-open=$(jq --arg author "$AUTHOR" --arg marker "$MARKER" '[.[] | select(.comments[0].author == $author and (.comments[0].body | contains($marker)) and (.resolved | not))] | length' \
+open=$(jq --arg author "$AUTHOR" --arg marker "$MARKER" '[.[] | select((.comments[0].author | sub("\\[bot\\]$"; "")) == $author and (.comments[0].body | contains($marker)) and (.resolved | not))] | length' \
   "$CONTEXT/review-threads.json")
 approved=$(gh api --paginate "repos/$REPO/pulls/$PR/reviews?per_page=100" | jq -s --arg author "$AUTHOR[bot]" --arg marker "$MARKER" --arg head "$head" '[.[][] | select(.user.login == $author and .state == "APPROVED" and (.body // "" | contains($marker)) and .commit_id == $head)] | length')
 reviewed=$(gh api "repos/$REPO/commits/$head/status" | jq --arg status "$STATUS" '[.statuses[] | select(.context == $status)] | length')
@@ -45,6 +45,7 @@ asked=$(jq -s --arg author "$AUTHOR" --arg marker "$MARKER" --arg mention "$MENT
   [(.[0].comments[] | {who: .author.login, body, at: .createdAt, answer: true}),
    (.[0].reviews[] | {who: .author.login, body, at: .submittedAt, answer: false}),
    (.[1][].comments | to_entries[] | .value + {who: .value.author, answer: (.key > 0)})]
+  | map(.who |= ((. // "") | sub("\\[bot\\]$"; "")))
   | (map(select(.who == $author and .answer and (.body | contains($marker))) | .at) | max // "") as $answered
   | map(select(.who != $author and .at > $answered
                and ((.body // "") | test($mention + "([^a-zA-Z0-9_-]|$)"; "i"))))

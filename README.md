@@ -199,7 +199,10 @@ jobs:
 # Codex Review Action
 
 Reviews PRs against the same conventions as Claude, posts inline findings,
-answers `@codex` questions, and approves when its threads are resolved.
+answers `@codex-niteo` questions, and approves when its threads are resolved.
+Use a GitHub App installation token as `github_token`; the default bot name is
+`codex-niteo` (override with `bot_name`). The App needs Contents: read,
+Pull requests: write, Issues: write, and Commit statuses: write.
 Optional inputs: `rules` (default: `conventions backend frontend alembic`) and
 `model` (default: `gpt-6.1-sol`).
 
@@ -208,7 +211,6 @@ unprivileged user without passwordless sudo. Pass its persistent directory as
 `codex_home` and use the runner-provided `codex` executable on `PATH`.
 The container provides isolation; Codex's inner sandbox is disabled.
 GitHub tokens are withheld from Codex and used by a separate publishing step.
-Enable GitHub Actions PR approvals in repository settings.
 Confirmed authentication failures create `auth-required` in `codex_home` for
 the runner administrator to disable Codex eligibility until re-login.
 
@@ -265,22 +267,25 @@ jobs:
     runs-on: [self-hosted, codex-review]
     permissions:
       contents: read
-      pull-requests: write
-      issues: write
-      statuses: write
     steps:
+      - uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        id: app
+        with:
+          app-id: ${{ vars.CODEX_APP_ID }}
+          private-key: ${{ secrets.CODEX_APP_PRIVATE_KEY }}
       - uses: actions/checkout@v6
         with:
           ref: ${{ github.event_name == 'issue_comment' && format('refs/pull/{0}/merge', github.event.issue.number) || '' }}
           persist-credentials: false
       - uses: teamniteo/gha-actions/codex-review@main
         with:
+          github_token: ${{ steps.app.outputs.token }}
+          bot_name: ${{ steps.app.outputs.app-slug }}
           codex_home: /var/lib/codex-review
 ```
 
 Each reviewer approves only after its own threads are resolved. Drafts and
-reviewed commits are skipped. Comment events only answer mentions; they do not start a full review. Triggers below are
-restricted to trusted collaborators.
+reviewed commits are skipped. Comment events only answer mentions; they do not start a full review. The example restricts triggers to trusted collaborators.
 
 ## We're hiring!
 
