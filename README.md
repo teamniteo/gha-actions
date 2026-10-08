@@ -205,7 +205,7 @@ Optional inputs: `rules` (default: `conventions backend frontend alembic`) and
 
 Use a trusted private runner with Codex configured, `gh`, Python, and an
 unprivileged user without passwordless sudo. Pass its persistent directory as
-`codex_home` and use the runner-provided `codex` wrapper on `PATH`.
+`codex_home` and use the runner-provided `codex` executable on `PATH`.
 The container provides isolation; Codex's inner sandbox is disabled.
 GitHub tokens are withheld from Codex and used by a separate publishing step.
 Enable GitHub Actions PR approvals in repository settings.
