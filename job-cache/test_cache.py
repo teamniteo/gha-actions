@@ -20,7 +20,11 @@ class ReuseChecksTest(unittest.TestCase):
         self.root = Path(self.directory.name)
         self.event = {
             "action": "synchronize",
-            "pull_request": {"number": 42, "base": {"sha": "base"}},
+            "pull_request": {
+                "number": 42,
+                "base": {"sha": "base"},
+                "head": {"sha": "head"},
+            },
         }
         self.environment = {
             "GITHUB_EVENT_PATH": str(self.root / "event.json"),
@@ -65,6 +69,34 @@ class ReuseChecksTest(unittest.TestCase):
             patch.object(module, "api", side_effect=error or responses) as api,
         ):
             return module.check(), api.call_args_list
+
+    def test_full_override_bypasses_all_caches(self):
+        Path(os.environ["GITHUB_EVENT_PATH"]).write_text(json.dumps(self.event))
+        with (
+            patch.object(
+                module.subprocess,
+                "check_output",
+                return_value="chore: rerun\n\n[ci full]",
+            ),
+            patch.object(module, "api") as api,
+        ):
+            self.assertTrue(module.full_override())
+            self.assertEqual(module.check(), (False, "", {}))
+            api.assert_not_called()
+
+    def test_full_override_only_reads_latest_pr_commit(self):
+        Path(os.environ["GITHUB_EVENT_PATH"]).write_text(json.dumps(self.event))
+        with patch.object(
+            module.subprocess, "check_output", return_value="ordinary message"
+        ) as git:
+            self.assertFalse(module.full_override())
+            self.assertEqual(git.call_args.args[0][-1], "head")
+        with (
+            patch.dict(os.environ, {"GITHUB_EVENT_NAME": "push"}),
+            patch.object(module.subprocess, "check_output") as git,
+        ):
+            self.assertFalse(module.full_override())
+            git.assert_not_called()
 
     def test_github_fallback_populates_host_cache(self):
         (skip, key, source), calls = self.evaluate()

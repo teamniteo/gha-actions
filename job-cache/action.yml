@@ -11,6 +11,9 @@ inputs:
     description: Key from check mode. Required in save mode.
     default: ''
 outputs:
+  full:
+    description: Whether the latest PR commit message contains [ci full]. Bypass path filters and other skip rules when true.
+    value: ${{ steps.check.outputs.full }}
   skip:
     description: Whether this job already passed on the same PR base and merged tree.
     value: ${{ steps.check.outputs.skip }}

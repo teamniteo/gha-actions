@@ -41,8 +41,31 @@ def remember(key, source):
         print(f"Host cache unavailable: {error}")
 
 
-def check():
+def full_override():
     if os.environ["GITHUB_EVENT_NAME"] != "pull_request":
+        return False
+    event = json.loads(Path(os.environ["GITHUB_EVENT_PATH"]).read_text())
+    message = subprocess.check_output(
+        [
+            "git",
+            "-C",
+            os.environ["GITHUB_WORKSPACE"],
+            "log",
+            "-1",
+            "--format=%B",
+            event["pull_request"]["head"]["sha"],
+        ],
+        text=True,
+    )
+    return "[ci full]" in message
+
+
+def check(full=None):
+    if os.environ["GITHUB_EVENT_NAME"] != "pull_request":
+        return False, "", {}
+    if full is None:
+        full = full_override()
+    if full:
         return False, "", {}
     if not os.environ["CHECK_NAME"]:
         raise ValueError("check-name is required in check mode")
@@ -125,8 +148,11 @@ if __name__ == "__main__":
             {"run-id": os.environ["GITHUB_RUN_ID"], "head-sha": os.environ["HEAD_SHA"]},
         )
     else:
-        skip, key, source = check()
+        full = full_override()
+        skip, key, source = check(full=full)
         with Path(os.environ["GITHUB_OUTPUT"]).open("a") as output:
-            output.write(f"skip={str(skip).lower()}\nkey={key}\n")
+            output.write(
+                f"skip={str(skip).lower()}\nkey={key}\nfull={str(full).lower()}\n"
+            )
             for name, value in source.items():
                 output.write(f"{name}={value}\n")
