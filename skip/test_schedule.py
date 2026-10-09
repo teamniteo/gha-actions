@@ -25,15 +25,12 @@ class ScheduleTest(unittest.TestCase):
                 "GITHUB_RUN_ATTEMPT": "1",
                 "GITHUB_REPOSITORY": "owner/repo",
                 "GITHUB_RUN_ID": "20",
-                "CHECK_NAME": "Demo Full",
             },
         )
         self.env.start()
         self.addCleanup(self.env.stop)
 
-    def evaluate(
-        self, *, age=1, conclusion="success", name="Demo Full", expired=False, run_id=10
-    ):
+    def evaluate(self, *, age=1, conclusion="success", expired=False, run_id=10):
         created = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(
             days=age
         )
@@ -47,7 +44,7 @@ class ScheduleTest(unittest.TestCase):
                     }
                 ]
             },
-            {"jobs": [{"name": name, "conclusion": conclusion}]},
+            {"conclusion": conclusion},
         ]
         with patch.object(schedule, "api", side_effect=responses) as api:
             return schedule.skip(), api.call_count
@@ -57,7 +54,6 @@ class ScheduleTest(unittest.TestCase):
         for options in [
             {"age": 8},
             {"conclusion": "failure"},
-            {"name": "other job"},
             {"expired": True},
             {"run_id": 20},
         ]:

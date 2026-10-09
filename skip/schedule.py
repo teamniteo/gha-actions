@@ -31,23 +31,12 @@ def skip():
             if created <= cutoff:
                 continue
             run_id = artifact["workflow_run"]["id"]
-            page = 1
-            while True:
-                jobs = api(
-                    f"repos/{repo}/actions/runs/{run_id}/jobs?per_page=100&page={page}"
-                )["jobs"]
-                if any(
-                    job["name"] == os.environ["CHECK_NAME"]
-                    and job["conclusion"] == "success"
-                    for job in jobs
-                ):
-                    print(
-                        f"Skipping scheduled job: successful run {run_id} is within {days} days"
-                    )
-                    return True
-                if len(jobs) < 100:
-                    break
-                page += 1
+            run = api(f"repos/{repo}/actions/runs/{run_id}")
+            if run["conclusion"] == "success":
+                print(
+                    f"Skipping scheduled job: successful run {run_id} is within {days} days"
+                )
+                return True
     except (OSError, KeyError, ValueError, TypeError) as error:
         print(f"Unable to check schedule, running the job: {error}")
     return False

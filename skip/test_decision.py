@@ -60,7 +60,7 @@ class DecisionTest(unittest.TestCase):
             env = {
                 **os.environ,
                 "GITHUB_OUTPUT": str(output),
-                "CHECK_NAME": "Demo Full",
+                "GITHUB_JOB": "Demo Full",
                 "PATH_MATCH": "false",
                 "CACHE_KEY": "unused",
             }
@@ -82,7 +82,7 @@ class DecisionTest(unittest.TestCase):
             env = {
                 **os.environ,
                 "GITHUB_OUTPUT": str(output),
-                "CHECK_NAME": "Backend Tests",
+                "GITHUB_JOB": "Backend Tests",
                 "FULL": "true",
             }
             result = subprocess.run(

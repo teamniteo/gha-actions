@@ -1,3 +1,4 @@
+import json
 import os
 from pathlib import Path
 
@@ -34,7 +35,11 @@ if __name__ == "__main__":
         or os.environ.get("SCHEDULE_SKIP") == "true"
     ):
         key = ""
-    print(f"{'SKIP' if skip else 'RUN'} {os.environ['CHECK_NAME']}: {reason}")
+    matrix = json.loads(os.environ.get("MATRIX_JSON") or "null")
+    label = os.environ["GITHUB_JOB"] + (
+        f" {json.dumps(matrix, sort_keys=True)}" if matrix else ""
+    )
+    print(f"{'SKIP' if skip else 'RUN'} {label}: {reason}")
     with Path(os.environ["GITHUB_OUTPUT"]).open("a") as output:
         if skip:
             output.write("skip=true\n")

@@ -36,7 +36,8 @@ class ReuseChecksTest(unittest.TestCase):
             "GITHUB_RUN_ID": "20",
             "GITHUB_RUN_ATTEMPT": "1",
             "GITHUB_WORKFLOW_REF": "owner/repo/.github/workflows/ci.yml@refs/pull/42/merge",
-            "CHECK_NAME": "Browser Tests (1/3)",
+            "GITHUB_JOB": "browser_tests",
+            "MATRIX_JSON": '{"shard": 1}',
         }
         self.patch = patch.dict(os.environ, self.environment)
         self.patch.start()
@@ -47,7 +48,6 @@ class ReuseChecksTest(unittest.TestCase):
         self,
         *,
         conclusion="success",
-        name="Browser Tests (1/3)",
         expired=False,
         run_id=10,
         error=None,
@@ -62,7 +62,7 @@ class ReuseChecksTest(unittest.TestCase):
                     }
                 ]
             },
-            {"jobs": [{"name": name, "conclusion": conclusion}]},
+            {"conclusion": conclusion},
         ]
         with (
             patch.object(module.subprocess, "check_output", return_value=self.tree),
@@ -112,7 +112,6 @@ class ReuseChecksTest(unittest.TestCase):
             {"conclusion": "failure"},
             {"conclusion": "cancelled"},  # codespell:ignore cancelled
             {"conclusion": None},
-            {"name": "Browser Tests (2/3)"},
             {"expired": True},
             {"run_id": 20},
         ]:
@@ -122,7 +121,7 @@ class ReuseChecksTest(unittest.TestCase):
     def test_fingerprint_separates_inputs(self):
         _, original, _ = self.evaluate(conclusion="failure")[0]
         for variable in [
-            "CHECK_NAME",
+            "GITHUB_JOB",
             "GITHUB_REPOSITORY",
             "GITHUB_WORKFLOW_REF",
             "RUNNER_OS",
@@ -181,23 +180,16 @@ class ReuseChecksTest(unittest.TestCase):
         self.assertEqual(restored, source)
         self.assertEqual(calls, [])
 
-    def test_paginates_jobs(self):
-        Path(os.environ["GITHUB_EVENT_PATH"]).write_text(json.dumps(self.event))
-        responses = [
-            {
-                "artifacts": [
-                    {"expired": False, "workflow_run": {"id": 10, "head_sha": "a" * 40}}
-                ]
-            },
-            {"jobs": [{"name": "unrelated", "conclusion": "success"}] * 100},
-            {"jobs": [{"name": "Browser Tests (1/3)", "conclusion": "success"}]},
-        ]
-        with (
-            patch.object(module.subprocess, "check_output", return_value=self.tree),
-            patch.object(module, "api", side_effect=responses) as api,
-        ):
-            self.assertTrue(module.check()[0])
-            self.assertIn("page=2", api.call_args_list[-1].args[0])
+    def test_matrix_shards_have_distinct_keys(self):
+        original = self.evaluate(conclusion="failure")[0][1]
+        with patch.dict(os.environ, {"MATRIX_JSON": '{"shard": 2}'}):
+            self.assertNotEqual(self.evaluate(conclusion="failure")[0][1], original)
+
+    def test_matrix_object_order_does_not_change_key(self):
+        with patch.dict(os.environ, {"MATRIX_JSON": '{"shard": 1, "os": "linux"}'}):
+            original = self.evaluate(conclusion="failure")[0][1]
+        with patch.dict(os.environ, {"MATRIX_JSON": '{"os": "linux", "shard": 1}'}):
+            self.assertEqual(self.evaluate(conclusion="failure")[0][1], original)
 
 
 if __name__ == "__main__":

@@ -301,8 +301,6 @@ jobs:
       - uses: actions/checkout@v7
       - uses: teamniteo/gha-actions/skip@main
         id: skip
-        with:
-          check-name: Browser Tests (${{ matrix.shard }}/3)
       - run: make browser-tests shard=${{ matrix.shard }}
         if: steps.skip.outputs.run
       - uses: teamniteo/gha-actions/skip-save@main
@@ -311,7 +309,7 @@ jobs:
           key: ${{ steps.skip.outputs.key }}
 ```
 
-`check-name` must exactly match the job's displayed `name`, including matrix values. Guard setup and test steps, rather than the job itself, so GitHub still creates each individually required matrix check. `skip-save` belongs after all validation steps and must use the default success condition. Do not run it with `always()` or after a failed test. `actions: read` is needed on each job, including jobs that override workflow permissions. Python 3 and Git must be available before shell setup.
+Job identity comes automatically from `github.job` and canonicalized matrix values, so no name input is needed. Guard setup and test steps, rather than the job itself, so GitHub still creates each individually required matrix check. `skip-save` belongs after all validation steps and must use the default success condition. Do not run it with `always()` or after a failed test. `actions: read` is needed on each job, including jobs that override workflow permissions. Python 3 and Git must be available before shell setup.
 
 The key includes the repository, workflow path, PR number, base SHA, checked-out Git tree, check name, runner OS and architecture, and the cache implementation. A marker in `$HOST_CACHE_DIR` is shared across runner slots in the same organization on that host. On a miss, the action looks for a matching GitHub artifact and verifies the exact job succeeded in that run, then saves the result locally. Other jobs in that run can have failed. Missing or corrupt local caches, expired artifacts, failed jobs and API errors fall back to running the checks. Publishing cache artifacts is best effort. The host cache and GitHub fallback both retain the original successful run's ID and head SHA.
 
@@ -331,10 +329,12 @@ Both review actions upload an `ai-review-usage-*` artifact with token counts by 
 
 Path filtering is optional and handled by the same action: pass `filters: .github/filters.yml` and `filter: code` (or your job’s filter name). Consumers guard expensive steps only with `steps.skip.outputs.run`. The action checks unchanged-tree reuse first, then applies path filters on PRs. `[ci full]` bypasses both. Filtered jobs do not save success markers.
 
-For scheduled jobs, pass `interval-days: 7` and a repository-wide unique `interval-artifact` in both check and `skip-save`. `skip-save` must run after actual success even if `key` is empty (main or forced runs). Only actual executions publish interval markers; skipped jobs never refresh the interval. The action verifies the matching job succeeded before trusting an artifact’s creation date. API failures run the job normally.
+For scheduled jobs, pass `interval-days: 7` and a repository-wide unique `interval-artifact` in both check and `skip-save`. `skip-save` must run after actual success even if `key` is empty (main or forced runs). Only actual executions publish interval markers; skipped jobs never refresh the interval. The GitHub fallback verifies the source workflow succeeded before trusting an artifact’s creation date. API failures run the job normally.
 
 The `skip` output is the sole execution decision, and `reason` explains it in both outputs and logs. Use `always-run: true` for checks such as commit-message validation to log an explicit always-run decision. `[ci full]` bypasses every skip rule.
 
 The `skip` output is present (`true`) only when skipping; it is empty when execution is needed. Use `if: steps.skip.outputs.run` to run expensive steps and `skip-save`, or `if: steps.skip.outputs.skip` for skip-only restoration steps.
 
 Exactly one of `run=true` or `skip=true` is emitted from the same decision; the other output is empty. Use `if: steps.skip.outputs.run` for execution and saving, and `if: steps.skip.outputs.skip` for skip-only steps.
+
+Cache identities include the workflow job ID and all matrix values, independent of displayed job names. GitHub artifact fallback requires a successful source workflow, because the API does not expose workflow job IDs for matching individual job results. A failed sibling job therefore prevents GitHub fallback reuse for that run.

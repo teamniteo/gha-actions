@@ -69,8 +69,6 @@ def check(full=None):
         full = full_override()
     if full:
         return False, "", {}
-    if not os.environ["CHECK_NAME"]:
-        raise ValueError("check-name is required in check mode")
     event = json.loads(Path(os.environ["GITHUB_EVENT_PATH"]).read_text())
     pr = event["pull_request"]
     tree = subprocess.check_output(
@@ -83,12 +81,16 @@ def check(full=None):
         pr["number"],
         pr["base"]["sha"],
         tree,
-        os.environ["CHECK_NAME"],
+        os.environ["GITHUB_JOB"],
+        json.loads(os.environ.get("MATRIX_JSON") or "null"),
         os.environ.get("RUNNER_OS"),
         os.environ.get("RUNNER_ARCH"),
         hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
     ]
-    key = "ci-success-v2-" + hashlib.sha256(json.dumps(identity).encode()).hexdigest()
+    key = (
+        "ci-success-v2-"
+        + hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()
+    )
     Path(os.environ["RUNNER_TEMP"], "job-cache-marker.txt").write_text(tree)
     if (
         event["action"] != "synchronize"
@@ -116,26 +118,15 @@ def check(full=None):
             run_id = candidate["workflow_run"]["id"]
             if candidate["expired"] or str(run_id) == os.environ["GITHUB_RUN_ID"]:
                 continue
-            page = 1
-            while True:
-                jobs = api(
-                    f"repos/{repo}/actions/runs/{run_id}/jobs?per_page=100&page={page}"
-                )["jobs"]
-                if any(
-                    job["name"] == os.environ["CHECK_NAME"]
-                    and job["conclusion"] == "success"
-                    for job in jobs
-                ):
-                    print(f"Reusing successful checks from run {run_id}")
-                    source = {
-                        "run-id": str(run_id),
-                        "head-sha": candidate["workflow_run"]["head_sha"],
-                    }
-                    remember(key, source)
-                    return True, key, source
-                if len(jobs) < 100:
-                    break
-                page += 1
+            run = api(f"repos/{repo}/actions/runs/{run_id}")
+            if run["conclusion"] == "success":
+                print(f"Reusing successful checks from run {run_id}")
+                source = {
+                    "run-id": str(run_id),
+                    "head-sha": candidate["workflow_run"]["head_sha"],
+                }
+                remember(key, source)
+                return True, key, source
     except (OSError, subprocess.SubprocessError, KeyError, ValueError) as error:
         print(f"Unable to reuse checks, running the job: {error}")
     return False, key, {}

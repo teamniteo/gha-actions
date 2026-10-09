@@ -1,9 +1,6 @@
 name: Decide whether a CI job should run
 description: Decide and explain job execution using cached results, path filters, schedules and the full CI override.
 inputs:
-  check-name:
-    description: Exact check name, including the matrix shard. Required in check mode.
-    default: ''
   always-run:
     description: Always run this job, for example commit-message validation.
     default: 'false'
@@ -48,7 +45,7 @@ runs:
       shell: bash
       env:
         ALWAYS_RUN: ${{ inputs.always-run }}
-        CHECK_NAME: ${{ inputs.check-name }}
+        MATRIX_JSON: ${{ toJSON(matrix) }}
         GH_TOKEN: ${{ github.token }}
       run: python3 "$GITHUB_ACTION_PATH/cache.py" check
     - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
@@ -65,14 +62,14 @@ runs:
         INTERVAL_ARTIFACT: ${{ inputs.interval-artifact }}
         FULL: ${{ steps.check.outputs.full }}
         ALWAYS_RUN: ${{ inputs.always-run }}
-        CHECK_NAME: ${{ inputs.check-name }}
+        MATRIX_JSON: ${{ toJSON(matrix) }}
         GH_TOKEN: ${{ github.token }}
       run: python3 "$GITHUB_ACTION_PATH/schedule.py"
     - id: decision
       shell: bash
       env:
         ALWAYS_RUN: ${{ inputs.always-run }}
-        CHECK_NAME: ${{ inputs.check-name }}
+        MATRIX_JSON: ${{ toJSON(matrix) }}
         FULL: ${{ steps.check.outputs.full }}
         CACHED_SKIP: ${{ steps.check.outputs.skip }}
         CACHE_KEY: ${{ steps.check.outputs.key }}
