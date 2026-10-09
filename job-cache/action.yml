@@ -1,0 +1,48 @@
+name: Reuse successful job results
+description: Reuse a job's successful result for unchanged PR code, checking host-cache before GitHub.
+inputs:
+  mode:
+    description: check before expensive steps, save as the final successful step.
+    default: check
+  check-name:
+    description: Exact check name, including the matrix shard. Required in check mode.
+    default: ''
+  key:
+    description: Key from check mode. Required in save mode.
+    default: ''
+outputs:
+  skip:
+    description: Whether this job already passed on the same PR base and merged tree.
+    value: ${{ steps.check.outputs.skip }}
+  key:
+    description: Key to pass to save mode after the job succeeds.
+    value: ${{ steps.check.outputs.key }}
+  run-id:
+    description: Original successful run, for restoring any outputs needed downstream.
+    value: ${{ steps.check.outputs.run-id }}
+  head-sha:
+    description: Original successful run's head SHA, for finding commit-specific artifacts.
+    value: ${{ steps.check.outputs.head-sha }}
+runs:
+  using: composite
+  steps:
+    - id: check
+      if: inputs.mode == 'check'
+      shell: bash
+      env:
+        CHECK_NAME: ${{ inputs.check-name }}
+        GH_TOKEN: ${{ github.token }}
+      run: python3 "$GITHUB_ACTION_PATH/cache.py" check
+    - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      if: inputs.mode == 'save' && inputs.key != ''
+      continue-on-error: true
+      with:
+        name: ${{ inputs.key }}
+        path: ${{ runner.temp }}/job-cache-marker.txt
+        overwrite: true
+    - if: inputs.mode == 'save' && inputs.key != ''
+      shell: bash
+      env:
+        CACHE_KEY: ${{ inputs.key }}
+        HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      run: python3 "$GITHUB_ACTION_PATH/cache.py" save
