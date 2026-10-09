@@ -114,9 +114,21 @@ This GitHub Action builds the project's container image, pushes it to the app's 
 
 The action creates a relocatable venv from `uv.lock` and runs `nix-build -A image --arg venv <path>`. Define the image in the project's `default.nix` using `pkgs.dockerTools.streamLayeredImage`, and accept `venv` as an argument. Use `project` (default `.`) for the Python project directory and `prebuild` for commands to run before building. A project that is not Python passes `build` instead, a command that produces the same executable `./result`.
 
-Each deployment cordons and stops the app Machines before deploying, then starts and uncordons them. Once stopping has been attempted, the start-and-uncordon step also runs after failure or cancellation; the action still reports the original failure. Release-command Machines are excluded so cleanup cannot rerun migrations. A failed release command leaves the app Machines on their existing images, but a later rollout failure can leave some Machines updated. Restarting uses each Machine’s current image and does not undo database changes.
+With `strategy: stop`, each deployment cordons and stops the app Machines before deploying, then starts and uncordons them. Once stopping has been attempted, the start-and-uncordon step also runs after failure or cancellation; the action still reports the original failure. Release-command Machines are excluded so cleanup cannot rerun migrations. A failed release command leaves the app Machines on their existing images, but a later rollout failure can leave some Machines updated. Restarting uses each Machine’s current image and does not undo database changes.
 
 An app that cannot go away on every deploy, such as one with always-on workers or several deploys a day, passes `strategy: rolling`: the Machines keep running and `flyctl deploy --strategy rolling` replaces them one at a time, so the release command has run before the first Machine changes and the old version keeps serving until its replacement passes its checks. There is nothing to restart afterwards; a rollout that fails part way leaves a mix of versions, which the next deploy or a `flyctl deploy --image` of the previous tag resolves.
+
+The default, `strategy: auto`, supports Alembic apps backed by PostgreSQL. The action compares the incoming Alembic heads with `public.alembic_version` in the deployed database, using SSH and the Machine's `DATABASE_URL`. Matching revisions select rolling; pending migrations, an empty database, or an unavailable Machine/database select stop. An invalid local Alembic configuration fails the deployment. This checks actual database state, so skipped deployments or migrations applied during a failed deployment are accounted for.
+
+Set `alembic-config` (default `etc/production.ini`) relative to `project`. Alembic must be on the runner's `PATH`, and the deployed image must contain `sh` and `psql`. The release command must leave the database and RLS unchanged when no migrations are pending. Apps that reset or load database content on every release must set `strategy: stop`. Apps without Alembic/PostgreSQL must explicitly select `stop` or `rolling`. Auto assumes the release uses the same database queried on the deployed Machine; use stop when changing its connection secrets.
+
+```yaml
+  - uses: teamniteo/gha-actions/fly-deploy@main
+    with:
+      app: myproject
+      token: ${{ secrets.FLY_API_TOKEN }}
+      project: backend
+```
 
 Configure the release command, service health checks and graceful shutdown in `backend/fly.toml` when the project has a `backend/` directory, or `fly.toml` at the repository root otherwise.
 
