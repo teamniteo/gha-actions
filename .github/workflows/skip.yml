@@ -28,14 +28,19 @@ jobs:
       - run: python3 -m unittest discover -s skip -p 'test_*.py'
       - name: Verify saving without a cache key is harmless
         uses: ./skip-save
+      - run: |
+          cat > "$RUNNER_TEMP/skip.yml" <<'YAML'
+          filters:
+            unused: ['**', '!**']
+          jobs:
+            tests:
+              filter: unused
+          YAML
+          cp "$RUNNER_TEMP/skip.yml" .smoke-skip.yml
       - uses: ./skip
         id: filtered
         with:
-          filter: unused
-          filters: |
-            unused:
-              - '**'
-              - '!**'
+          config: .smoke-skip.yml
       - name: Verify the unified decision and reason
         if: github.event_name == 'pull_request'
         env:

@@ -4,11 +4,8 @@ inputs:
   key:
     description: Key from skip. An empty key skips result-cache saving.
     default: ''
-  interval-days:
-    description: Scheduled interval configured in skip. Zero disables interval markers.
-    default: '0'
   interval-artifact:
-    description: The same scheduled-execution artifact name configured in skip.
+    description: Scheduled marker from skip. An empty name skips interval saving.
     default: ''
 runs:
   using: composite
@@ -26,11 +23,11 @@ runs:
         CACHE_KEY: ${{ inputs.key }}
         HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       run: python3 "$GITHUB_ACTION_PATH/../skip/cache.py" save
-    - if: inputs.interval-days != '0'
+    - if: inputs.interval-artifact != ''
       shell: bash
       run: date -u +%Y-%m-%dT%H:%M:%SZ > "$RUNNER_TEMP/job-cache-interval.txt"
     - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-      if: inputs.interval-days != '0'
+      if: inputs.interval-artifact != ''
       continue-on-error: true
       with:
         name: ${{ inputs.interval-artifact }}
