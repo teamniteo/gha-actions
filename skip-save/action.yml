@@ -12,7 +12,9 @@ runs:
       env:
         POLICY_FILE: ${{ inputs.config }}
         MATRIX_JSON: ${{ toJSON(matrix) }}
-      run: python3 "$GITHUB_ACTION_PATH/../skip/config.py"
+      run: |
+        source "$GITHUB_ACTION_PATH/../skip/setup-python.sh"
+        "$GHA_SKIP_PYTHON" "$GITHUB_ACTION_PATH/../skip/config.py"
 
     - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       if: env.GHA_SKIP_KEY != ''

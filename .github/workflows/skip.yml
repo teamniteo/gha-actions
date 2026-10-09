@@ -28,7 +28,10 @@ jobs:
         with:
           fetch-depth: 2
           persist-credentials: false
-      - run: python3 -m unittest discover -s skip -p 'test_*.py'
+      - run: bash skip/test_setup_python.sh
+      - run: |
+          source skip/setup-python.sh
+          "$GHA_SKIP_PYTHON" -m unittest discover -s skip -p 'test_*.py'
       - name: Verify saving without a cache key is harmless
         uses: ./skip-save
 

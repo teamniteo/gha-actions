@@ -34,7 +34,9 @@ runs:
       env:
         POLICY_FILE: ${{ inputs.config }}
         MATRIX_JSON: ${{ toJSON(matrix) }}
-      run: python3 "$GITHUB_ACTION_PATH/config.py"
+      run: |
+        source "$GITHUB_ACTION_PATH/setup-python.sh"
+        "$GHA_SKIP_PYTHON" "$GITHUB_ACTION_PATH/config.py"
     - id: check
       shell: bash
       env:

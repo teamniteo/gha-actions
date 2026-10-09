@@ -331,7 +331,7 @@ Schedule selectors match matrix values exactly. Use a repository-wide unique art
 
 Guard expensive steps rather than entire jobs. For downstream artifacts, use `run-id` and `head-sha` to restore the original successful output when skipping, and republish under the current commit name if needed. The decision alone cannot recreate artifacts or prevent external deployments.
 
-Python 3 and Git must be available before shell setup. YAML is read using bundled pure-Python PyYAML, with no runtime installation. Jobs need `actions: read`; path-filtered jobs also need `pull-requests: read`.
+Python 3 and Git must be available before shell setup. The actions reuse PyYAML from the runner's Python when available. Otherwise they install PyYAML 6.0.3 into a temporary virtualenv (Python venv support and access to PyPI are required). `skip` and `skip-save` reuse the selected interpreter across job steps, including after project shell setup changes `PATH`. Jobs need `actions: read`; path-filtered jobs also need `pull-requests: read`.
 
 ## We're hiring!
 

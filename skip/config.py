@@ -1,10 +1,8 @@
 import json
 import os
-import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent / "vendor" / "pyyaml.zip"))
-import yaml  # noqa: E402
+import yaml
 
 
 def resolve(config, job, matrix):
