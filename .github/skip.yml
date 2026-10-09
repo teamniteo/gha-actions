@@ -1,0 +1,6 @@
+# Exercise the default policy path in the action smoke tests.
+filters:
+  unused: ['**', '!**']
+jobs:
+  tests:
+    filter: unused

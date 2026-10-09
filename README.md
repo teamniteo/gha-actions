@@ -282,6 +282,57 @@ jobs:
 
 Each reviewer approves only after its own threads are resolved and a follow-up review finds nothing new. Resolving a thread does not trigger GitHub Actions: after resolving the reviewer's last thread, post a new PR comment (for example, `Resolved all threads`) or submit a review to trigger that follow-up without a new commit. Both reviewers use the same policy. Drafts never trigger reviews or answers. Already-approved commits and reviewed commits with unresolved threads skip reviewing, but mentions still get answers. Comments can also start a review of a commit the bot has not reviewed yet. The example restricts triggers to trusted collaborators.
 
+# Skip and Skip Save Actions
+
+`skip` decides and logs whether a CI job runs. `skip-save` records actual successful executions. Every required job still starts and retains its check name. Configure all skip policies in one checkout-relative YAML file:
+
+```yaml
+filters:
+  application:
+    - '**'
+    - '!frontend/tests/**'
+jobs:
+  backend_checks:
+    filter: always
+  browser_tests:
+    filter: application
+  demo_content:
+    filter: application
+    schedule:
+      matrix: {day: full}
+      days: 7
+      artifact: last_full_run
+```
+
+Each job calls the same action using its automatically inferred workflow job ID and matrix values:
+
+```yaml
+
+- uses: actions/checkout@v7
+  with:
+    fetch-depth: 2
+
+- uses: teamniteo/gha-actions/skip@main
+  id: skip
+- run: make tests
+  if: steps.skip.outputs.run
+
+- uses: teamniteo/gha-actions/skip-save@main
+  if: steps.skip.outputs.run
+```
+
+Exactly one of `run` or `skip` is present (`true`); the other is empty. `reason` explains the decision in outputs and logs. Jobs absent from the configuration use normal unchanged-tree result reuse without path or schedule rules. Both actions default to `.github/skip.yml`. Set `config` to use a different path, or explicitly set `config: ''` to disable policy rules. `filter: always` bypasses every skip rule and is suitable for commit-message validation.
+
+Include `[ci full]` in the latest PR commit message to bypass result reuse, path filters and schedules. Main/manual runs do not reuse PR results or apply PR path filters. Opening/reopening PRs and workflow reruns bypass result reuse. Reruns also bypass schedules.
+
+Successful results match repository, PR, base, merged tree, workflow job ID, canonical matrix values and runner platform. The host-cache is checked first; GitHub artifacts are the fallback. The fallback requires a successful source workflow because the API does not expose workflow job IDs for matching individual results. GitHub errors and cache misses run checks normally.
+
+Schedule selectors match matrix values exactly. Use a repository-wide unique artifact name for each schedule. Only actual executions publish interval markers; skipped runs never postpone the interval. The source workflow must have succeeded. Both actions read the same policy file and infer schedules by job ID and matrix values. `skip` records the original result key in the job environment before tests can modify files. `skip-save` reads that key automatically and handles empty keys and interval markers internally and must run only after successful validation, never with `always()`.
+
+Guard expensive steps rather than entire jobs. For downstream artifacts, use `run-id` and `head-sha` to restore the original successful output when skipping, and republish under the current commit name if needed. The decision alone cannot recreate artifacts or prevent external deployments.
+
+Python 3 and Git must be available before shell setup. The actions reuse PyYAML from the runner's Python when available. Otherwise they install PyYAML 6.0.3 into a temporary virtualenv (Python venv support and access to PyPI are required). `skip` and `skip-save` reuse the selected interpreter across job steps, including after project shell setup changes `PATH`. Jobs need `actions: read`; path-filtered jobs also need `pull-requests: read`.
+
 ## We're hiring!
 
 At Niteo we regularly contribute back to the Open Source community. If you do too, we'd like to invite you to [join our team](https://niteo.co/careers)!

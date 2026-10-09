@@ -1,0 +1,78 @@
+name: Decide whether a CI job should run
+description: Decide and explain job execution using cached results, path filters, schedules and the full CI override.
+inputs:
+  config:
+    description: Checkout-relative YAML file containing filters and job skip policies.
+    default: .github/skip.yml
+outputs:
+  run:
+    description: Present (true) when the job should run; empty when it should skip.
+    value: ${{ steps.decision.outputs.run }}
+  reason:
+    description: Human-readable explanation of the run or skip decision, also printed in logs.
+    value: ${{ steps.decision.outputs.reason }}
+  full:
+    description: Whether the latest PR commit message contains [ci full]. Bypass path filters and other skip rules when true.
+    value: ${{ steps.check.outputs.full }}
+  skip:
+    description: Present (true) when the job should skip; empty when it should run.
+    value: ${{ steps.decision.outputs.skip }}
+  key:
+    description: Result identity, automatically shared with skip-save in the job environment.
+    value: ${{ steps.decision.outputs.key }}
+  run-id:
+    description: Original successful run, for restoring any outputs needed downstream.
+    value: ${{ steps.check.outputs.run-id }}
+  head-sha:
+    description: Original successful run's head SHA, for finding commit-specific artifacts.
+    value: ${{ steps.check.outputs.head-sha }}
+runs:
+  using: composite
+  steps:
+    - id: config
+      shell: bash
+      env:
+        POLICY_FILE: ${{ inputs.config }}
+        MATRIX_JSON: ${{ toJSON(matrix) }}
+      run: |
+        source "$GITHUB_ACTION_PATH/setup-python.sh"
+        "$GHA_SKIP_PYTHON" "$GITHUB_ACTION_PATH/config.py"
+    - id: check
+      shell: bash
+      env:
+        ALWAYS_RUN: ${{ steps.config.outputs.always-run }}
+        MATRIX_JSON: ${{ toJSON(matrix) }}
+        GH_TOKEN: ${{ github.token }}
+      run: python3 "$GITHUB_ACTION_PATH/cache.py" check
+
+    - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
+      id: paths
+      if: steps.config.outputs.always-run != 'true' && steps.config.outputs.filter != '' && github.event_name == 'pull_request' && steps.check.outputs.skip != 'true' && steps.check.outputs.full != 'true'
+      with:
+        predicate-quantifier: some-with-excludes
+        filters: ${{ steps.config.outputs.filters }}
+    - id: schedule
+      if: steps.config.outputs.always-run != 'true' && steps.config.outputs.interval-days != '0' && steps.check.outputs.skip != 'true' && steps.paths.outputs[steps.config.outputs.filter] != 'false'
+      shell: bash
+      env:
+        INTERVAL_DAYS: ${{ steps.config.outputs.interval-days }}
+        INTERVAL_ARTIFACT: ${{ steps.config.outputs.interval-artifact }}
+        FULL: ${{ steps.check.outputs.full }}
+        ALWAYS_RUN: ${{ steps.config.outputs.always-run }}
+        MATRIX_JSON: ${{ toJSON(matrix) }}
+        GH_TOKEN: ${{ github.token }}
+      run: python3 "$GITHUB_ACTION_PATH/schedule.py"
+    - id: decision
+      shell: bash
+      env:
+        ALWAYS_RUN: ${{ steps.config.outputs.always-run }}
+        MATRIX_JSON: ${{ toJSON(matrix) }}
+        FULL: ${{ steps.check.outputs.full }}
+        CACHED_SKIP: ${{ steps.check.outputs.skip }}
+        CACHE_KEY: ${{ steps.check.outputs.key }}
+        EVENT_ACTION: ${{ github.event.action }}
+        INTERVAL_DAYS: ${{ steps.config.outputs.interval-days }}
+        PATH_FILTER: ${{ steps.config.outputs.filter }}
+        SCHEDULE_SKIP: ${{ steps.schedule.outputs.skip }}
+        PATH_MATCH: ${{ steps.paths.outputs[steps.config.outputs.filter] }}
+      run: python3 "$GITHUB_ACTION_PATH/decision.py"

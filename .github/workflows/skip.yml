@@ -1,0 +1,95 @@
+name: CI skip tests
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/skip.yml'
+      - '.github/skip.yml'
+      - 'skip/**'
+      - 'skip-save/**'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/skip.yml'
+      - '.github/skip.yml'
+      - 'skip/**'
+      - 'skip-save/**'
+permissions:
+  actions: read
+  contents: read
+  pull-requests: read
+jobs:
+  tests:
+    name: CI skip tests
+    runs-on: ubuntu-latest
+    steps:
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - run: bash skip/test_setup_python.sh
+      - run: |
+          source skip/setup-python.sh
+          "$GHA_SKIP_PYTHON" -m unittest discover -s skip -p 'test_*.py'
+      - name: Verify saving without a cache key is harmless
+        uses: ./skip-save
+
+      - uses: ./skip
+        id: filtered
+      - name: Verify the unified decision and reason
+        if: github.event_name == 'pull_request'
+        env:
+          SKIP: ${{ steps.filtered.outputs.skip }}
+          FULL: ${{ steps.filtered.outputs.full }}
+          REASON: ${{ steps.filtered.outputs.reason }}
+          KEY: ${{ steps.filtered.outputs.key }}
+        run: |
+          test -n "$REASON"
+          test -z "$KEY"
+          if [[ "$FULL" == true ]]; then
+            test -z "$SKIP"
+          else
+            test "$SKIP" = true
+          fi
+  smoke:
+    name: CI skip smoke (${{ matrix.shard }}/2)
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        shard: [1, 2]
+    steps:
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+
+      - uses: ./skip
+        id: skip
+      - name: Produce a downstream artifact
+        if: steps.skip.outputs.run
+        env:
+          SHARD: ${{ matrix.shard }}
+        run: echo "$SHARD" > "$RUNNER_TEMP/skip-output.txt"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: steps.skip.outputs.run
+        with:
+          name: output_${{ github.event.pull_request.head.sha || github.sha }}_${{ matrix.shard }}
+          path: ${{ runner.temp }}/skip-output.txt
+      - name: Restore the original successful output
+        if: steps.skip.outputs.skip
+        uses: dawidd6/action-download-artifact@634d83b91986fcec9be314054943fa5c976aeb0e # v25
+        with:
+          run_id: ${{ steps.skip.outputs.run-id }}
+          name: output_${{ steps.skip.outputs.head-sha }}_${{ matrix.shard }}
+          path: ${{ runner.temp }}/restored
+      - name: Verify the restored shard output
+        if: steps.skip.outputs.skip
+        env:
+          SHARD: ${{ matrix.shard }}
+        run: test "$(cat "$RUNNER_TEMP/restored/skip-output.txt")" = "$SHARD"
+
+      - uses: ./skip-save
+        if: steps.skip.outputs.run
