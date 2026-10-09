@@ -30,8 +30,12 @@ inputs:
     description: Command that builds the image in place of the uv and nix-build steps, leaving the same executable ./result. For projects that are not Python.
     default:
   strategy:
-    description: How the app Machines get the new image. "stop" cordons and stops every app Machine, deploys, then starts and uncordons them. "rolling" leaves them running and has flyctl replace them one at a time, for an app that cannot go away on every deploy.
-    default: stop
+    description: >-
+      How app Machines get the new image. "stop" cordons and stops them before deployment, then starts and uncordons them. "rolling" replaces them one at a time. "auto" compares incoming Alembic heads with the deployed PostgreSQL database, rolling when they match and stopping otherwise.
+    default: auto
+  alembic-config:
+    description: Alembic config relative to project, used by strategy auto. Requires Alembic on the runner and psql plus DATABASE_URL on the deployed Machine (PostgreSQL, public.alembic_version).
+    default: etc/production.ini
 
 outputs:
   url:
@@ -91,19 +95,21 @@ runs:
         SECRETS: ${{ inputs.secrets }}
       run: flyctl secrets import -a "$APP" --stage <<< "$SECRETS"
 
-    - name: Check the strategy
+    - name: Select the strategy
+      id: strategy
       shell: bash
+      working-directory: ${{ inputs.project }}
       env:
+        ACTION_PATH: ${{ github.action_path }}
         STRATEGY: ${{ inputs.strategy }}
-      run: |
-        case "$STRATEGY" in
-          stop|rolling) ;;
-          *) echo "::error::strategy must be stop or rolling, not '$STRATEGY'"; exit 1 ;;
-        esac
+        ALEMBIC_CONFIG: ${{ inputs.alembic-config }}
+        APP: ${{ inputs.app }}
+        FLY_API_TOKEN: ${{ inputs.token }}
+      run: bash "$ACTION_PATH/strategy.sh"
 
     - name: Stop the app
       id: stop
-      if: ${{ inputs.strategy == 'stop' }}
+      if: ${{ steps.strategy.outputs.strategy == 'stop' }}
       shell: bash
       env:
         APP: ${{ inputs.app }}
@@ -126,7 +132,7 @@ runs:
         APP: ${{ inputs.app }}
         FLY_API_TOKEN: ${{ inputs.token }}
         SHA: ${{ inputs.sha }}
-        STRATEGY: ${{ inputs.strategy }}
+        STRATEGY: ${{ steps.strategy.outputs.strategy }}
       run: |
         config=fly.toml
         if [[ -d backend ]]; then
