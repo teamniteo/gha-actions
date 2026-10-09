@@ -342,4 +342,3 @@ At Niteo we regularly contribute back to the Open Source community. If you do to
 ### Review token usage
 
 Both review actions upload an `ai-review-usage-*` artifact with token counts by model: fresh input, cache reads, cache writes and output. Artifacts contain no prompts or review content and expire after 14 days. Usage capture is best-effort and never fails a review. Interrupted sessions without a terminal usage record are not estimated.
-
