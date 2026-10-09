@@ -282,9 +282,9 @@ jobs:
 
 Each reviewer approves only after its own threads are resolved and a follow-up review finds nothing new. Resolving a thread does not trigger GitHub Actions: after resolving the reviewer's last thread, post a new PR comment (for example, `Resolved all threads`) or submit a review to trigger that follow-up without a new commit. Both reviewers use the same policy. Drafts never trigger reviews or answers. Already-approved commits and reviewed commits with unresolved threads skip reviewing, but mentions still get answers. Comments can also start a review of a commit the bot has not reviewed yet. The example restricts triggers to trusted collaborators.
 
-# Job Result Cache Action
+# Skip and Skip Save Actions
 
-Skip expensive steps after message-only amendments or squashes while keeping every required job and matrix check name green. Run `skip` immediately after checkout, then call it again with `mode: save` as the final successful step. Backend checks that validate commit messages should always run.
+Skip expensive steps after message-only amendments or squashes while keeping every required job and matrix check name green. Run `skip` immediately after checkout, then call `skip-save` as the final successful step. Backend checks that validate commit messages should always run.
 
 ```yaml
 jobs:
@@ -305,20 +305,19 @@ jobs:
           check-name: Browser Tests (${{ matrix.shard }}/3)
       - run: make browser-tests shard=${{ matrix.shard }}
         if: steps.skip.outputs.skip != 'true'
-      - uses: teamniteo/gha-actions/skip@main
-        if: steps.skip.outputs.key != '' && steps.skip.outputs.skip != 'true'
+      - uses: teamniteo/gha-actions/skip-save@main
+        if: steps.skip.outputs.skip != 'true'
         with:
-          mode: save
           key: ${{ steps.skip.outputs.key }}
 ```
 
-`check-name` must exactly match the job's displayed `name`, including matrix values. Guard setup and test steps, rather than the job itself, so GitHub still creates each individually required matrix check. Save mode belongs after all validation steps and must use the default success condition. Do not run it with `always()` or after a failed test. `actions: read` is needed on each job, including jobs that override workflow permissions. Python 3 and Git must be available before shell setup.
+`check-name` must exactly match the job's displayed `name`, including matrix values. Guard setup and test steps, rather than the job itself, so GitHub still creates each individually required matrix check. `skip-save` belongs after all validation steps and must use the default success condition. Do not run it with `always()` or after a failed test. `actions: read` is needed on each job, including jobs that override workflow permissions. Python 3 and Git must be available before shell setup.
 
 The key includes the repository, workflow path, PR number, base SHA, checked-out Git tree, check name, runner OS and architecture, and the cache implementation. A marker in `$HOST_CACHE_DIR` is shared across runner slots in the same organization on that host. On a miss, the action looks for a matching GitHub artifact and verifies the exact job succeeded in that run, then saves the result locally. Other jobs in that run can have failed. Missing or corrupt local caches, expired artifacts, failed jobs and API errors fall back to running the checks. Publishing cache artifacts is best effort. The host cache and GitHub fallback both retain the original successful run's ID and head SHA.
 
 Include `[ci full]` anywhere in the latest PR commit message to force execution. Check mode then outputs `full=true`, `skip=false`, and an empty `key`, bypassing both host and GitHub caches. Use `steps.skip.outputs.full != 'true'` to guard path-filter or schedule checks, so the same override forces those checks to run too. Checkout must make the PR head commit available (for the default PR merge checkout, use `fetch-depth: 2` or greater).
 
-Only `pull_request` synchronize events reuse results. Opening or reopening a PR, pushing to main, manual runs and reruns execute checks normally. Manual runs and main pushes do not save PR markers. Call check mode before generating files, so the key describes the checked-out tree, and pass its `key` unchanged to save mode.
+Only `pull_request` synchronize events reuse results. Opening or reopening a PR, pushing to main, manual runs and reruns execute checks normally. Manual runs and main pushes do not save PR markers. Call check mode before generating files, so the key describes the checked-out tree, and pass its `key` unchanged to `skip-save`.
 
 Jobs with downstream build artifacts must also preserve those artifacts. On a hit, use the `run-id` and `head-sha` outputs to download the original successful build, then republish it under the current commit's artifact name. If restoration fails, rebuild normally. A success marker alone does not recreate build outputs or prevent an external deployment such as a Heroku Review App build.
 
@@ -332,6 +331,6 @@ Both review actions upload an `ai-review-usage-*` artifact with token counts by 
 
 Path filtering is optional and handled by the same action: pass `filters: .github/filters.yml` and `filter: code` (or your job’s filter name). Consumers guard expensive steps only with `steps.skip.outputs.skip != 'true'`. The action checks unchanged-tree reuse first, then applies path filters on PRs. `[ci full]` bypasses both. Filtered jobs do not save success markers.
 
-For scheduled jobs, pass `interval-days: 7` and a repository-wide unique `interval-artifact` in both check and save mode. Save mode must run after actual success even if `key` is empty (main or forced runs). Only actual executions publish interval markers; skipped jobs never refresh the interval. The action verifies the matching job succeeded before trusting an artifact’s creation date. API failures run the job normally.
+For scheduled jobs, pass `interval-days: 7` and a repository-wide unique `interval-artifact` in both check and `skip-save`. `skip-save` must run after actual success even if `key` is empty (main or forced runs). Only actual executions publish interval markers; skipped jobs never refresh the interval. The action verifies the matching job succeeded before trusting an artifact’s creation date. API failures run the job normally.
 
 The `skip` output is the sole execution decision, and `reason` explains it in both outputs and logs. Use `always-run: true` for checks such as commit-message validation to log an explicit always-run decision. `[ci full]` bypasses every skip rule.

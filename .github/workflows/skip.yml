@@ -5,11 +5,13 @@ on:
     paths:
       - '.github/workflows/skip.yml'
       - 'skip/**'
+      - 'skip-save/**'
   push:
     branches: [main]
     paths:
       - '.github/workflows/skip.yml'
       - 'skip/**'
+      - 'skip-save/**'
 permissions:
   actions: read
   contents: read
@@ -24,6 +26,8 @@ jobs:
           fetch-depth: 2
           persist-credentials: false
       - run: python3 -m unittest discover -s skip -p 'test_*.py'
+      - name: Verify saving without a cache key is harmless
+        uses: ./skip-save
       - uses: ./skip
         id: filtered
         with:
@@ -85,8 +89,7 @@ jobs:
         env:
           SHARD: ${{ matrix.shard }}
         run: test "$(cat "$RUNNER_TEMP/restored/skip-output.txt")" = "$SHARD"
-      - uses: ./skip
-        if: steps.skip.outputs.key != '' && steps.skip.outputs.skip != 'true'
+      - uses: ./skip-save
+        if: steps.skip.outputs.skip != 'true'
         with:
-          mode: save
           key: ${{ steps.skip.outputs.key }}

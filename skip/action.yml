@@ -1,14 +1,8 @@
 name: Decide whether a CI job should run
 description: Decide and explain job execution using cached results, path filters, schedules and the full CI override.
 inputs:
-  mode:
-    description: check before expensive steps, save as the final successful step.
-    default: check
   check-name:
     description: Exact check name, including the matrix shard. Required in check mode.
-    default: ''
-  key:
-    description: Key from check mode. Required in save mode.
     default: ''
   always-run:
     description: Always run this job, for example commit-message validation.
@@ -36,7 +30,7 @@ outputs:
     description: Whether expensive steps can be skipped, considering cached results and path filters.
     value: ${{ steps.decision.outputs.skip }}
   key:
-    description: Key to pass to save mode after the job succeeds.
+    description: Key to pass to skip-save after the job succeeds.
     value: ${{ steps.decision.outputs.key }}
   run-id:
     description: Original successful run, for restoring any outputs needed downstream.
@@ -48,7 +42,6 @@ runs:
   using: composite
   steps:
     - id: check
-      if: inputs.mode == 'check'
       shell: bash
       env:
         ALWAYS_RUN: ${{ inputs.always-run }}
@@ -57,12 +50,12 @@ runs:
       run: python3 "$GITHUB_ACTION_PATH/cache.py" check
     - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
       id: paths
-      if: inputs.mode == 'check' && inputs.always-run != 'true' && inputs.filter != '' && github.event_name == 'pull_request' && steps.check.outputs.skip != 'true' && steps.check.outputs.full != 'true'
+      if: inputs.always-run != 'true' && inputs.filter != '' && github.event_name == 'pull_request' && steps.check.outputs.skip != 'true' && steps.check.outputs.full != 'true'
       with:
         predicate-quantifier: some-with-excludes
         filters: ${{ inputs.filters }}
     - id: schedule
-      if: inputs.mode == 'check' && inputs.always-run != 'true' && inputs.interval-days != '0' && steps.check.outputs.skip != 'true' && steps.paths.outputs[inputs.filter] != 'false'
+      if: inputs.always-run != 'true' && inputs.interval-days != '0' && steps.check.outputs.skip != 'true' && steps.paths.outputs[inputs.filter] != 'false'
       shell: bash
       env:
         INTERVAL_DAYS: ${{ inputs.interval-days }}
@@ -73,7 +66,6 @@ runs:
         GH_TOKEN: ${{ github.token }}
       run: python3 "$GITHUB_ACTION_PATH/schedule.py"
     - id: decision
-      if: inputs.mode == 'check'
       shell: bash
       env:
         ALWAYS_RUN: ${{ inputs.always-run }}
@@ -84,26 +76,3 @@ runs:
         SCHEDULE_SKIP: ${{ steps.schedule.outputs.skip }}
         PATH_MATCH: ${{ steps.paths.outputs[inputs.filter] }}
       run: python3 "$GITHUB_ACTION_PATH/decision.py"
-    - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-      if: inputs.mode == 'save' && inputs.key != ''
-      continue-on-error: true
-      with:
-        name: ${{ inputs.key }}
-        path: ${{ runner.temp }}/job-cache-marker.txt
-        overwrite: true
-    - if: inputs.mode == 'save' && inputs.key != ''
-      shell: bash
-      env:
-        CACHE_KEY: ${{ inputs.key }}
-        HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-      run: python3 "$GITHUB_ACTION_PATH/cache.py" save
-    - if: inputs.mode == 'save' && inputs.interval-days != '0'
-      shell: bash
-      run: date -u +%Y-%m-%dT%H:%M:%SZ > "$RUNNER_TEMP/job-cache-interval.txt"
-    - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-      if: inputs.mode == 'save' && inputs.interval-days != '0'
-      continue-on-error: true
-      with:
-        name: ${{ inputs.interval-artifact }}
-        path: ${{ runner.temp }}/job-cache-interval.txt
-        overwrite: true
