@@ -49,26 +49,64 @@ else: print(json.dumps(dict(statuses=[dict(context='test-review')] if f['reviewe
     def test_new_commit_reviews(self):
         self.assertEqual(self.prepare()['mode'], 'review')
 
-    def test_comment_only_answers(self):
+    def test_comments_can_start_initial_review(self):
         for event in ('issue_comment', 'pull_request_review_comment'):
-            self.assertEqual(self.prepare(event, '@claude why?')['mode'], 'answer')
-            self.assertEqual(self.prepare(event)['mode'], 'skip')
+            self.assertEqual(self.prepare(event, '@claude why?')['mode'], 'review')
+            self.assertEqual(self.prepare(event)['mode'], 'review')
 
     def test_mentions_do_not_match_longer_bot_names(self):
-        self.assertEqual(self.prepare('issue_comment', '@claude-other why?')['mode'], 'skip')
+        self.assertEqual(self.prepare('issue_comment', '@claude-other why?', reviewed=True, approved=True)['mode'], 'skip')
+
+    def test_resolved_threads_allow_follow_up_review_on_comments(self):
+        for author, marker in (('claude', ''), ('codex-niteo', '<!-- codex-review -->')):
+            threads = [dict(id=1, resolved=True, comments=[
+                dict(author=author+'[bot]', body=marker, at='2026-01-01')])]
+            for event in ('issue_comment', 'pull_request_review_comment', 'pull_request_review'):
+                with self.subTest(author=author, event=event):
+                    result = self.prepare(event, reviewed=True, threads=threads,
+                                          author=author, marker=marker)
+                    self.assertEqual(result['mode'], 'review')
+                    self.assertEqual(result['skip'], '')
+                    self.assertEqual(result['run'], 'true')
+
+    def test_follow_up_comments_preserve_review_guards(self):
+        for author, marker in (('claude', ''), ('codex-niteo', '<!-- codex-review -->')):
+            threads = [dict(id=1, resolved=False, comments=[
+                dict(author=author, body=marker, at='2026-01-01')])]
+            for event in ('issue_comment', 'pull_request_review_comment'):
+                for guard in (dict(approved=True), dict(threads=threads)):
+                    with self.subTest(author=author, event=event, guard=guard):
+                        kwargs = dict(reviewed=True, author=author, marker=marker, **guard)
+                        self.assertEqual(self.prepare(event, **kwargs)['mode'], 'skip')
+                        self.assertEqual(self.prepare(event, '@'+author+' why?', **kwargs)['mode'], 'answer')
+
+    def test_codex_rereview_comment_after_resolution(self):
+        # https://github.com/mayetrx/vend/pull/910#issuecomment-6069560753
+        marker = '<!-- codex-review -->'
+        threads = [dict(id=1, resolved=True, comments=[
+            dict(author='codex-niteo', body=marker, at='2026-01-01')])]
+        result = self.prepare('issue_comment', '@codex-niteo rereview', reviewed=True,
+                              threads=threads, author='codex-niteo', marker=marker)
+        self.assertEqual(result['mode'], 'review')
+        self.assertEqual(result['skip'], '')
 
     def test_approved_commit_skips_but_answers_mentions(self):
         self.assertEqual(self.prepare(reviewed=True, approved=True)['mode'], 'skip')
         self.assertEqual(self.prepare(comment='@claude why?', reviewed=True, approved=True)['mode'], 'answer')
 
-    def test_draft_skips_but_answers_mentions(self):
-        self.assertEqual(self.prepare(draft=True)['mode'], 'skip')
-        self.assertEqual(self.prepare(draft=True, comment='@claude why?')['mode'], 'answer')
+    def test_drafts_never_review_or_answer(self):
+        for author in ('claude', 'codex-niteo'):
+            for event in ('pull_request', 'issue_comment', 'pull_request_review_comment', 'pull_request_review'):
+                with self.subTest(author=author, event=event):
+                    result = self.prepare(event, '@'+author+' why?', draft=True, author=author)
+                    self.assertEqual(result['mode'], 'skip')
+                    self.assertEqual(result['run'], 'false')
+                    self.assertEqual(result['skip'], 'the PR is a draft')
 
     def test_codex_app_mention_answers_without_review(self):
-        result=self.prepare('issue_comment', '@codex-niteo why?', author='codex-niteo')
+        result=self.prepare('issue_comment', '@codex-niteo why?', author='codex-niteo', reviewed=True, approved=True)
         self.assertEqual(result['mode'], 'answer')
-        result=self.prepare('issue_comment', '@codex why?', author='codex-niteo')
+        result=self.prepare('issue_comment', '@codex why?', author='codex-niteo', reviewed=True, approved=True)
         self.assertEqual(result['mode'], 'skip')
 
     def test_bot_suffix_does_not_hide_open_threads(self):

@@ -59,14 +59,9 @@ elif [ "$reviewed" -gt 0 ] && [ "$open" -gt 0 ]; then
   skip="already reviewed $head and $open threads are unresolved"
 fi
 mode=review
-case "$EVENT" in
-  issue_comment|pull_request_review_comment)
-    skip="comment events answer questions only"
-    ;;
-esac
 if [ -n "$skip" ]; then
   mode=skip
-  if [ "$asked" -gt 0 ] || grep -qiE "$MENTION([^a-zA-Z0-9_-]|$)" <<< "$COMMENT"; then
+  if [ "$draft" != true ] && { [ "$asked" -gt 0 ] || grep -qiE "$MENTION([^a-zA-Z0-9_-]|$)" <<< "$COMMENT"; }; then
     mode=answer
   fi
 fi
