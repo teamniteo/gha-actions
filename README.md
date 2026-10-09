@@ -329,3 +329,9 @@ At Niteo we regularly contribute back to the Open Source community. If you do to
 ### Review token usage
 
 Both review actions upload an `ai-review-usage-*` artifact with token counts by model: fresh input, cache reads, cache writes and output. Artifacts contain no prompts or review content and expire after 14 days. Usage capture is best-effort and never fails a review. Interrupted sessions without a terminal usage record are not estimated.
+
+Path filtering is optional and handled by the same action: pass `filters: .github/filters.yml` and `filter: code` (or your job’s filter name). Consumers guard expensive steps only with `steps.reuse.outputs.skip != 'true'`. The action checks unchanged-tree reuse first, then applies path filters on PRs. `[ci full]` bypasses both. Filtered jobs do not save success markers.
+
+For scheduled jobs, pass `interval-days: 7` and a repository-wide unique `interval-artifact` in both check and save mode. Save mode must run after actual success even if `key` is empty (main or forced runs). Only actual executions publish interval markers; skipped jobs never refresh the interval. The action verifies the matching job succeeded before trusting an artifact’s creation date. API failures run the job normally.
+
+The `skip` output is the sole execution decision, and `reason` explains it in both outputs and logs. Use `always-run: true` for checks such as commit-message validation to log an explicit always-run decision. `[ci full]` bypasses every skip rule.

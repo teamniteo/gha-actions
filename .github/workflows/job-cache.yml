@@ -13,6 +13,7 @@ on:
 permissions:
   actions: read
   contents: read
+  pull-requests: read
 jobs:
   tests:
     name: Job cache tests
@@ -23,6 +24,30 @@ jobs:
           fetch-depth: 2
           persist-credentials: false
       - run: python3 -m unittest discover -s job-cache -p 'test_*.py'
+      - uses: ./job-cache
+        id: filtered
+        with:
+          check-name: Job cache tests
+          filter: unused
+          filters: |
+            unused:
+              - '**'
+              - '!**'
+      - name: Verify the unified decision and reason
+        if: github.event_name == 'pull_request'
+        env:
+          SKIP: ${{ steps.filtered.outputs.skip }}
+          FULL: ${{ steps.filtered.outputs.full }}
+          REASON: ${{ steps.filtered.outputs.reason }}
+          KEY: ${{ steps.filtered.outputs.key }}
+        run: |
+          test -n "$REASON"
+          test -z "$KEY"
+          if [[ "$FULL" == true ]]; then
+            test "$SKIP" = false
+          else
+            test "$SKIP" = true
+          fi
   smoke:
     name: Job cache smoke (${{ matrix.shard }}/2)
     runs-on: ubuntu-latest

@@ -61,6 +61,8 @@ def full_override():
 
 
 def check(full=None):
+    if os.environ.get("ALWAYS_RUN") == "true":
+        return False, "", {}
     if os.environ["GITHUB_EVENT_NAME"] != "pull_request":
         return False, "", {}
     if full is None:
