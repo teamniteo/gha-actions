@@ -3,7 +3,7 @@ description: Decide and explain job execution using cached results, path filters
 inputs:
   config:
     description: Checkout-relative YAML file containing filters and job skip policies.
-    default: ''
+    default: .github/skip.yml
 outputs:
   run:
     description: Present (true) when the job should run; empty when it should skip.
@@ -18,7 +18,7 @@ outputs:
     description: Present (true) when the job should skip; empty when it should run.
     value: ${{ steps.decision.outputs.skip }}
   key:
-    description: Key to pass to skip-save after the job succeeds.
+    description: Result identity, automatically shared with skip-save in the job environment.
     value: ${{ steps.decision.outputs.key }}
   run-id:
     description: Original successful run, for restoring any outputs needed downstream.
@@ -42,6 +42,7 @@ runs:
         MATRIX_JSON: ${{ toJSON(matrix) }}
         GH_TOKEN: ${{ github.token }}
       run: python3 "$GITHUB_ACTION_PATH/cache.py" check
+
     - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
       id: paths
       if: steps.config.outputs.always-run != 'true' && steps.config.outputs.filter != '' && github.event_name == 'pull_request' && steps.check.outputs.skip != 'true' && steps.check.outputs.full != 'true'

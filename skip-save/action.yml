@@ -1,12 +1,9 @@
 name: Save a successful CI execution
 description: Record successful job results and scheduled executions after expensive steps finish.
 inputs:
-  key:
-    description: Key from skip. An empty key skips result-cache saving.
-    default: ''
   config:
     description: Checkout-relative YAML policy file, matching the skip action.
-    default: ''
+    default: .github/skip.yml
 runs:
   using: composite
   steps:
@@ -16,22 +13,24 @@ runs:
         POLICY_FILE: ${{ inputs.config }}
         MATRIX_JSON: ${{ toJSON(matrix) }}
       run: python3 "$GITHUB_ACTION_PATH/../skip/config.py"
+
     - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-      if: inputs.key != ''
+      if: env.GHA_SKIP_KEY != ''
       continue-on-error: true
       with:
-        name: ${{ inputs.key }}
+        name: ${{ env.GHA_SKIP_KEY }}
         path: ${{ runner.temp }}/job-cache-marker.txt
         overwrite: true
-    - if: inputs.key != ''
+    - if: env.GHA_SKIP_KEY != ''
       shell: bash
       env:
-        CACHE_KEY: ${{ inputs.key }}
+        CACHE_KEY: ${{ env.GHA_SKIP_KEY }}
         HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       run: python3 "$GITHUB_ACTION_PATH/../skip/cache.py" save
     - if: steps.config.outputs.interval-artifact != ''
       shell: bash
       run: date -u +%Y-%m-%dT%H:%M:%SZ > "$RUNNER_TEMP/job-cache-interval.txt"
+
     - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       if: steps.config.outputs.interval-artifact != ''
       continue-on-error: true

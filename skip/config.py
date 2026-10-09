@@ -11,7 +11,11 @@ def resolve(config, job, matrix):
     rule = config.get("jobs", {}).get(job, {})
     filters = config.get("filters", {})
     selected = rule.get("filter", "")
-    if selected and selected not in filters:
+    if "always" in filters:
+        raise ValueError("always is a reserved filter name")
+    if "always-run" in rule:
+        raise ValueError("Use filter: always for jobs that must always run")
+    if selected and selected != "always" and selected not in filters:
         raise ValueError(f"Unknown filter {selected!r} for job {job!r}")
     schedule = rule.get("schedule", {})
     selector = schedule.get("matrix", {})
@@ -22,9 +26,7 @@ def resolve(config, job, matrix):
     artifact = schedule.get("artifact", "") if days else ""
     if days < 0 or days and not artifact:
         raise ValueError("A schedule requires nonnegative days and an artifact name")
-    always = rule.get("always-run", False)
-    if not isinstance(always, bool):
-        raise ValueError("always-run must be a YAML boolean")
+    always = selected == "always"
     return {
         "always-run": str(always).lower(),
         "filter": selected,

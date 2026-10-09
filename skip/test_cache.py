@@ -70,6 +70,13 @@ class ReuseChecksTest(unittest.TestCase):
         ):
             return module.check(), api.call_args_list
 
+    def test_always_run_bypasses_warm_cache(self):
+        self.evaluate()
+        with patch.dict(os.environ, {"ALWAYS_RUN": "true"}):
+            result, calls = self.evaluate()
+            self.assertEqual(result, (False, "", {}))
+            self.assertEqual(calls, [])
+
     def test_full_override_bypasses_all_caches(self):
         Path(os.environ["GITHUB_EVENT_PATH"]).write_text(json.dumps(self.event))
         with (

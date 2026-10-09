@@ -40,6 +40,8 @@ if __name__ == "__main__":
         f" {json.dumps(matrix, sort_keys=True)}" if matrix else ""
     )
     print(f"{'SKIP' if skip else 'RUN'} {label}: {reason}")
+    with Path(os.environ["GITHUB_ENV"]).open("a") as environment:
+        environment.write(f"GHA_SKIP_KEY={key}\n")
     with Path(os.environ["GITHUB_OUTPUT"]).open("a") as output:
         if skip:
             output.write("skip=true\n")

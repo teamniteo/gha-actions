@@ -60,6 +60,7 @@ class DecisionTest(unittest.TestCase):
             env = {
                 **os.environ,
                 "GITHUB_OUTPUT": str(output),
+                "GITHUB_ENV": str(Path(root, "env")),
                 "GITHUB_JOB": "Demo Full",
                 "PATH_MATCH": "false",
                 "CACHE_KEY": "unused",
@@ -72,6 +73,7 @@ class DecisionTest(unittest.TestCase):
                 check=True,
             )
             self.assertIn("SKIP Demo Full: No changed files", result.stdout)
+            self.assertEqual(Path(root, "env").read_text(), "GHA_SKIP_KEY=\n")
             self.assertIn(
                 "skip=true\nkey=\nreason=No changed files", output.read_text()
             )
@@ -82,6 +84,7 @@ class DecisionTest(unittest.TestCase):
             env = {
                 **os.environ,
                 "GITHUB_OUTPUT": str(output),
+                "GITHUB_ENV": str(Path(root, "env")),
                 "GITHUB_JOB": "Backend Tests",
                 "FULL": "true",
             }
@@ -99,3 +102,22 @@ class DecisionTest(unittest.TestCase):
                     line.startswith("skip=") for line in output.read_text().splitlines()
                 )
             )
+
+    def test_original_key_is_shared_with_save(self):
+        with tempfile.TemporaryDirectory() as root:
+            key = "ci-success-v2-" + "a" * 64
+            env = {
+                **os.environ,
+                "GITHUB_OUTPUT": str(Path(root, "outputs")),
+                "GITHUB_ENV": str(Path(root, "env")),
+                "GITHUB_JOB": "backend_tests",
+                "CACHE_KEY": key,
+            }
+            subprocess.run(
+                [sys.executable, str(Path(__file__).with_name("decision.py"))],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            self.assertEqual(Path(root, "env").read_text(), f"GHA_SKIP_KEY={key}\n")

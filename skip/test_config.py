@@ -16,7 +16,7 @@ filters:
   application: ['**', '!frontend/tests/**']
 jobs:
   backend_checks:
-    always-run: true
+    filter: always
   browser_tests:
     filter: application
   demo_content:
@@ -63,3 +63,7 @@ jobs:
         ]:
             with self.subTest(rule=rule), self.assertRaises(ValueError):
                 policy.resolve({"jobs": {"job": rule}}, "job", {})
+
+    def test_always_cannot_be_redefined_as_a_path_filter(self):
+        with self.assertRaisesRegex(ValueError, "reserved"):
+            policy.resolve({"filters": {"always": ["!**"]}}, "job", {})
