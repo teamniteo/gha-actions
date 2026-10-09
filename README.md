@@ -320,7 +320,7 @@ Each job calls the same action using its automatically inferred workflow job ID 
   if: steps.skip.outputs.run
   with:
     key: ${{ steps.skip.outputs.key }}
-    interval-artifact: ${{ steps.skip.outputs.interval-artifact }}
+    config: .github/skip.yml
 ```
 
 Exactly one of `run` or `skip` is present (`true`); the other is empty. `reason` explains the decision in outputs and logs. Jobs absent from the configuration use normal unchanged-tree result reuse without path or schedule rules. An omitted configuration disables policy rules. `always-run: true` bypasses every skip rule and is suitable for commit-message validation.
@@ -329,7 +329,7 @@ Include `[ci full]` in the latest PR commit message to bypass result reuse, path
 
 Successful results match repository, PR, base, merged tree, workflow job ID, canonical matrix values and runner platform. The host-cache is checked first; GitHub artifacts are the fallback. The fallback requires a successful source workflow because the API does not expose workflow job IDs for matching individual results. GitHub errors and cache misses run checks normally.
 
-Schedule selectors match matrix values exactly. Use a repository-wide unique artifact name for each schedule. Only actual executions publish interval markers; skipped runs never postpone the interval. The source workflow must have succeeded. `skip-save` handles empty keys and interval markers internally and must run only after successful validation, never with `always()`.
+Schedule selectors match matrix values exactly. Use a repository-wide unique artifact name for each schedule. Only actual executions publish interval markers; skipped runs never postpone the interval. The source workflow must have succeeded. Both actions read the same policy file and infer schedules by job ID and matrix values. `skip-save` handles empty keys and interval markers internally and must run only after successful validation, never with `always()`.
 
 Guard expensive steps rather than entire jobs. For downstream artifacts, use `run-id` and `head-sha` to restore the original successful output when skipping, and republish under the current commit name if needed. The decision alone cannot recreate artifacts or prevent external deployments.
 

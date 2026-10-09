@@ -4,12 +4,18 @@ inputs:
   key:
     description: Key from skip. An empty key skips result-cache saving.
     default: ''
-  interval-artifact:
-    description: Scheduled marker from skip. An empty name skips interval saving.
+  config:
+    description: Checkout-relative YAML policy file, matching the skip action.
     default: ''
 runs:
   using: composite
   steps:
+    - id: config
+      shell: bash
+      env:
+        POLICY_FILE: ${{ inputs.config }}
+        MATRIX_JSON: ${{ toJSON(matrix) }}
+      run: python3 "$GITHUB_ACTION_PATH/../skip/config.py"
     - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       if: inputs.key != ''
       continue-on-error: true
@@ -23,13 +29,13 @@ runs:
         CACHE_KEY: ${{ inputs.key }}
         HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       run: python3 "$GITHUB_ACTION_PATH/../skip/cache.py" save
-    - if: inputs.interval-artifact != ''
+    - if: steps.config.outputs.interval-artifact != ''
       shell: bash
       run: date -u +%Y-%m-%dT%H:%M:%SZ > "$RUNNER_TEMP/job-cache-interval.txt"
     - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-      if: inputs.interval-artifact != ''
+      if: steps.config.outputs.interval-artifact != ''
       continue-on-error: true
       with:
-        name: ${{ inputs.interval-artifact }}
+        name: ${{ steps.config.outputs.interval-artifact }}
         path: ${{ runner.temp }}/job-cache-interval.txt
         overwrite: true

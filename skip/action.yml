@@ -5,9 +5,6 @@ inputs:
     description: Checkout-relative YAML file containing filters and job skip policies.
     default: ''
 outputs:
-  interval-artifact:
-    description: Scheduled-execution marker to pass to skip-save after actual success.
-    value: ${{ steps.config.outputs.interval-artifact }}
   run:
     description: Present (true) when the job should run; empty when it should skip.
     value: ${{ steps.decision.outputs.run }}
