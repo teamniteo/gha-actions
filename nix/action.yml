@@ -103,6 +103,37 @@ runs:
         echo "=== CPU Virtualization Support ==="
         grep -E 'vmx|svm' /proc/cpuinfo | head -1 | grep -oE 'vmx|svm' && echo "CPU supports virtualization" || echo "CPU does NOT support virtualization"
 
+    - name: Restore dist cache
+      id: dist_cache
+      shell: bash
+      run: |
+        runner_python="$(command -v python3 || true)"
+        echo "runner_python=$runner_python" >> "$GITHUB_OUTPUT"
+        if [ -n "$runner_python" ]; then
+          "$runner_python" "${{ github.action_path }}/dist-cache.py" restore "$RUNNER_TEMP/dist-cache-state.json"
+        else
+          echo "Dist cache skipped: runner Python is unavailable"
+        fi
+
+    - name: Restore Elm cache
+      id: elm_cache
+      shell: bash
+      run: |
+        if [ -z "${HOST_CACHE_DIR:-}" ]; then
+          echo "Elm cache skipped: HOST_CACHE_DIR is not set"
+          exit 0
+        fi
+        echo "enabled=true" >> "$GITHUB_OUTPUT"
+        ELM_HOME="$(mktemp -d "$RUNNER_TEMP/elm-home.XXXXXX")"
+        export ELM_HOME
+        echo "ELM_HOME=$ELM_HOME" >> "$GITHUB_ENV"
+        runner_python="${{ steps.dist_cache.outputs.runner_python }}"
+        if [ -n "$runner_python" ]; then
+          "$runner_python" "${{ github.action_path }}/elm-cache.py" restore "$RUNNER_TEMP/elm-cache-state.json"
+        else
+          echo "Elm cache skipped: runner Python is unavailable; using private ELM_HOME"
+        fi
+
     # Build and evaluate the shell exactly once. nix print-dev-env realizes
     # the same derivations the old `nix-shell --run echo` warm-up built, and
     # additionally captures the resulting environment -- one step, both jobs.
@@ -148,6 +179,24 @@ runs:
         '
 
         echo "BASH_ENV=$RUNNER_TEMP/nix-shell-bash-env.bash" >> "$GITHUB_ENV"
+
+    - name: Save dist cache
+      if: steps.dist_cache.outputs.runner_python != ''
+      shell: bash
+      env:
+        BASH_ENV: /dev/null
+      run: |
+        runner_python="${{ steps.dist_cache.outputs.runner_python }}"
+        "$runner_python" "${{ github.action_path }}/dist-cache.py" save "$RUNNER_TEMP/dist-cache-state.json"
+
+    - name: Save Elm cache
+      if: steps.elm_cache.outputs.enabled == 'true' && steps.dist_cache.outputs.runner_python != ''
+      shell: bash
+      env:
+        BASH_ENV: /dev/null
+      run: |
+        runner_python="${{ steps.dist_cache.outputs.runner_python }}"
+        "$runner_python" "${{ github.action_path }}/elm-cache.py" save "$RUNNER_TEMP/elm-cache-state.json"
 
     # Report how long this job waited for a runner, for the box's Prometheus
     # metrics. Only the job itself can measure this: the queue is over by the
