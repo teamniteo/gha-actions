@@ -304,9 +304,9 @@ jobs:
         with:
           check-name: Browser Tests (${{ matrix.shard }}/3)
       - run: make browser-tests shard=${{ matrix.shard }}
-        if: ${{ !steps.skip.outputs.skip }}
+        if: steps.skip.outputs.run
       - uses: teamniteo/gha-actions/skip-save@main
-        if: ${{ !steps.skip.outputs.skip }}
+        if: steps.skip.outputs.run
         with:
           key: ${{ steps.skip.outputs.key }}
 ```
@@ -329,10 +329,12 @@ At Niteo we regularly contribute back to the Open Source community. If you do to
 
 Both review actions upload an `ai-review-usage-*` artifact with token counts by model: fresh input, cache reads, cache writes and output. Artifacts contain no prompts or review content and expire after 14 days. Usage capture is best-effort and never fails a review. Interrupted sessions without a terminal usage record are not estimated.
 
-Path filtering is optional and handled by the same action: pass `filters: .github/filters.yml` and `filter: code` (or your job’s filter name). Consumers guard expensive steps only with `${{ !steps.skip.outputs.skip }}`. The action checks unchanged-tree reuse first, then applies path filters on PRs. `[ci full]` bypasses both. Filtered jobs do not save success markers.
+Path filtering is optional and handled by the same action: pass `filters: .github/filters.yml` and `filter: code` (or your job’s filter name). Consumers guard expensive steps only with `steps.skip.outputs.run`. The action checks unchanged-tree reuse first, then applies path filters on PRs. `[ci full]` bypasses both. Filtered jobs do not save success markers.
 
 For scheduled jobs, pass `interval-days: 7` and a repository-wide unique `interval-artifact` in both check and `skip-save`. `skip-save` must run after actual success even if `key` is empty (main or forced runs). Only actual executions publish interval markers; skipped jobs never refresh the interval. The action verifies the matching job succeeded before trusting an artifact’s creation date. API failures run the job normally.
 
 The `skip` output is the sole execution decision, and `reason` explains it in both outputs and logs. Use `always-run: true` for checks such as commit-message validation to log an explicit always-run decision. `[ci full]` bypasses every skip rule.
 
-The `skip` output is present (`true`) only when skipping; it is empty when execution is needed. Use `if: ${{ !steps.skip.outputs.skip }}` to run expensive steps and `skip-save`, or `if: steps.skip.outputs.skip` for skip-only restoration steps.
+The `skip` output is present (`true`) only when skipping; it is empty when execution is needed. Use `if: steps.skip.outputs.run` to run expensive steps and `skip-save`, or `if: steps.skip.outputs.skip` for skip-only restoration steps.
+
+Exactly one of `run=true` or `skip=true` is emitted from the same decision; the other output is empty. Use `if: steps.skip.outputs.run` for execution and saving, and `if: steps.skip.outputs.skip` for skip-only steps.

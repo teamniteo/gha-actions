@@ -20,6 +20,9 @@ inputs:
     description: Repository-wide artifact name tracking actual scheduled executions. Required with interval-days.
     default: ''
 outputs:
+  run:
+    description: Present (true) when the job should run; empty when it should skip.
+    value: ${{ steps.decision.outputs.run }}
   reason:
     description: Human-readable explanation of the run or skip decision, also printed in logs.
     value: ${{ steps.decision.outputs.reason }}

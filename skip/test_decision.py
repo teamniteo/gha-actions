@@ -93,6 +93,7 @@ class DecisionTest(unittest.TestCase):
                 check=True,
             )
             self.assertIn("RUN Backend Tests: Forced", result.stdout)
+            self.assertIn("run=true\n", output.read_text())
             self.assertFalse(
                 any(
                     line.startswith("skip=") for line in output.read_text().splitlines()

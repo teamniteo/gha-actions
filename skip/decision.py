@@ -38,4 +38,6 @@ if __name__ == "__main__":
     with Path(os.environ["GITHUB_OUTPUT"]).open("a") as output:
         if skip:
             output.write("skip=true\n")
+        else:
+            output.write("run=true\n")
         output.write(f"key={key}\nreason={reason}\n")
