@@ -3,13 +3,13 @@ on:
   workflow_dispatch:
   pull_request:
     paths:
-      - '.github/workflows/ci-skip.yml'
-      - 'ci-skip/**'
+      - '.github/workflows/skip.yml'
+      - 'skip/**'
   push:
     branches: [main]
     paths:
-      - '.github/workflows/ci-skip.yml'
-      - 'ci-skip/**'
+      - '.github/workflows/skip.yml'
+      - 'skip/**'
 permissions:
   actions: read
   contents: read
@@ -23,8 +23,8 @@ jobs:
         with:
           fetch-depth: 2
           persist-credentials: false
-      - run: python3 -m unittest discover -s ci-skip -p 'test_*.py'
-      - uses: ./ci-skip
+      - run: python3 -m unittest discover -s skip -p 'test_*.py'
+      - uses: ./skip
         id: filtered
         with:
           check-name: CI skip tests
@@ -59,34 +59,34 @@ jobs:
         with:
           fetch-depth: 2
           persist-credentials: false
-      - uses: ./ci-skip
-        id: ci-skip
+      - uses: ./skip
+        id: skip
         with:
           check-name: CI skip smoke (${{ matrix.shard }}/2)
       - name: Produce a downstream artifact
-        if: steps.ci-skip.outputs.skip != 'true'
+        if: steps.skip.outputs.skip != 'true'
         env:
           SHARD: ${{ matrix.shard }}
-        run: echo "$SHARD" > "$RUNNER_TEMP/ci-skip-output.txt"
+        run: echo "$SHARD" > "$RUNNER_TEMP/skip-output.txt"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        if: steps.ci-skip.outputs.skip != 'true'
+        if: steps.skip.outputs.skip != 'true'
         with:
           name: output_${{ github.event.pull_request.head.sha || github.sha }}_${{ matrix.shard }}
-          path: ${{ runner.temp }}/ci-skip-output.txt
+          path: ${{ runner.temp }}/skip-output.txt
       - name: Restore the original successful output
-        if: steps.ci-skip.outputs.skip == 'true'
+        if: steps.skip.outputs.skip == 'true'
         uses: dawidd6/action-download-artifact@634d83b91986fcec9be314054943fa5c976aeb0e # v25
         with:
-          run_id: ${{ steps.ci-skip.outputs.run-id }}
-          name: output_${{ steps.ci-skip.outputs.head-sha }}_${{ matrix.shard }}
+          run_id: ${{ steps.skip.outputs.run-id }}
+          name: output_${{ steps.skip.outputs.head-sha }}_${{ matrix.shard }}
           path: ${{ runner.temp }}/restored
       - name: Verify the restored shard output
-        if: steps.ci-skip.outputs.skip == 'true'
+        if: steps.skip.outputs.skip == 'true'
         env:
           SHARD: ${{ matrix.shard }}
-        run: test "$(cat "$RUNNER_TEMP/restored/ci-skip-output.txt")" = "$SHARD"
-      - uses: ./ci-skip
-        if: steps.ci-skip.outputs.key != '' && steps.ci-skip.outputs.skip != 'true'
+        run: test "$(cat "$RUNNER_TEMP/restored/skip-output.txt")" = "$SHARD"
+      - uses: ./skip
+        if: steps.skip.outputs.key != '' && steps.skip.outputs.skip != 'true'
         with:
           mode: save
-          key: ${{ steps.ci-skip.outputs.key }}
+          key: ${{ steps.skip.outputs.key }}
