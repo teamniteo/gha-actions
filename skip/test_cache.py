@@ -1,6 +1,7 @@
 import importlib.util
 import json
 import os
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -69,6 +70,73 @@ class ReuseChecksTest(unittest.TestCase):
             patch.object(module, "api", side_effect=error or responses) as api,
         ):
             return module.check(), api.call_args_list
+
+    def test_real_git_rewrites_reuse_results_but_code_changes_do_not(self):
+        repo = self.root / "repo"
+        repo.mkdir()
+
+        def git(*args):
+            return subprocess.check_output(
+                [
+                    "git",
+                    "-C",
+                    str(repo),
+                    "-c",
+                    "user.name=CI test",
+                    "-c",
+                    "user.email=ci@example.invalid",
+                    "-c",
+                    "commit.gpgsign=false",
+                    "-c",
+                    "core.hooksPath=/dev/null",
+                    *args,
+                ],
+                text=True,
+            ).strip()
+
+        git("init", "--quiet")
+        source = repo / "source.txt"
+        source.write_text("base\n")
+        git("add", "source.txt")
+        git("commit", "--quiet", "-m", "Base")
+        base = git("rev-parse", "HEAD")
+        self.event["pull_request"]["base"]["sha"] = base
+        for content in ["first\n", "second\n"]:
+            source.write_text(content)
+            git("commit", "--quiet", "-am", content.strip())
+
+        def check():
+            self.event["pull_request"]["head"]["sha"] = git("rev-parse", "HEAD")
+            Path(os.environ["GITHUB_EVENT_PATH"]).write_text(json.dumps(self.event))
+            return module.check()
+
+        with (
+            patch.dict(os.environ, {"GITHUB_WORKSPACE": str(repo)}),
+            patch.object(module, "api", return_value={"artifacts": []}),
+        ):
+            skip, key, _ = check()
+            self.assertFalse(skip)
+            original = git("rev-parse", "HEAD")
+            module.remember(key, {"run-id": "10", "head-sha": original})
+
+            git("commit", "--quiet", "--amend", "-m", "Reworded")
+            self.assertNotEqual(git("rev-parse", "HEAD"), original)
+            self.assertEqual(check()[:2], (True, key))
+
+            git("reset", "--soft", base)
+            git("commit", "--quiet", "-m", "Squashed")
+            self.assertEqual(git("rev-list", "--count", f"{base}..HEAD"), "1")
+            self.assertEqual(check()[:2], (True, key))
+
+            git("commit", "--quiet", "--amend", "-m", "Squashed [ci full]")
+            self.assertEqual(check(), (False, "", {}))
+            git("commit", "--quiet", "--amend", "-m", "Squashed")
+
+            source.write_text("changed code\n")
+            git("commit", "--quiet", "-am", "Changed code")
+            skip, changed_key, _ = check()
+            self.assertFalse(skip)
+            self.assertNotEqual(changed_key, key)
 
     def test_always_run_bypasses_warm_cache(self):
         self.evaluate()
