@@ -75,3 +75,26 @@ class DecisionTest(unittest.TestCase):
             self.assertIn(
                 "skip=true\nkey=\nreason=No changed files", output.read_text()
             )
+
+    def test_cli_run_decision_leaves_skip_absent(self):
+        with tempfile.TemporaryDirectory() as root:
+            output = Path(root, "outputs")
+            env = {
+                **os.environ,
+                "GITHUB_OUTPUT": str(output),
+                "CHECK_NAME": "Backend Tests",
+                "FULL": "true",
+            }
+            result = subprocess.run(
+                [sys.executable, str(Path(__file__).with_name("decision.py"))],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            self.assertIn("RUN Backend Tests: Forced", result.stdout)
+            self.assertFalse(
+                any(
+                    line.startswith("skip=") for line in output.read_text().splitlines()
+                )
+            )

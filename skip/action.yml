@@ -27,7 +27,7 @@ outputs:
     description: Whether the latest PR commit message contains [ci full]. Bypass path filters and other skip rules when true.
     value: ${{ steps.check.outputs.full }}
   skip:
-    description: Whether expensive steps can be skipped, considering cached results and path filters.
+    description: Present (true) when the job should skip; empty when it should run.
     value: ${{ steps.decision.outputs.skip }}
   key:
     description: Key to pass to skip-save after the job succeeds.

@@ -36,4 +36,6 @@ if __name__ == "__main__":
         key = ""
     print(f"{'SKIP' if skip else 'RUN'} {os.environ['CHECK_NAME']}: {reason}")
     with Path(os.environ["GITHUB_OUTPUT"]).open("a") as output:
-        output.write(f"skip={str(skip).lower()}\nkey={key}\nreason={reason}\n")
+        if skip:
+            output.write("skip=true\n")
+        output.write(f"key={key}\nreason={reason}\n")
