@@ -94,6 +94,20 @@ else: print(json.dumps(dict(statuses=[dict(context='test-review')] if f['reviewe
         self.assertEqual(self.prepare(reviewed=True, approved=True)['mode'], 'skip')
         self.assertEqual(self.prepare(comment='@claude why?', reviewed=True, approved=True)['mode'], 'answer')
 
+    def test_approved_commit_without_status_skips_but_answers_mentions(self):
+        # A push during review can leave the approval on the new head while
+        # the completion status is recorded on the head captured at startup.
+        for author, marker in (('claude', ''), ('codex-niteo', '<!-- codex-review -->')):
+            with self.subTest(author=author):
+                kwargs = dict(approved=True, author=author, marker=marker)
+                result = self.prepare(**kwargs)
+                self.assertEqual(result['mode'], 'skip')
+                self.assertEqual(result['run'], 'false')
+                self.assertEqual(result['skip'], 'already approved abc')
+                result = self.prepare(comment='@'+author+' why?', **kwargs)
+                self.assertEqual(result['mode'], 'answer')
+                self.assertEqual(result['run'], 'true')
+
     def test_drafts_never_review_or_answer(self):
         for author in ('claude', 'codex-niteo'):
             for event in ('pull_request', 'issue_comment', 'pull_request_review_comment', 'pull_request_review'):
