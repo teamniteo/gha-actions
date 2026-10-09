@@ -53,7 +53,7 @@ asked=$(jq -s --arg author "$AUTHOR" --arg marker "$MARKER" --arg mention "$MENT
 skip=""
 if [ "$draft" = true ]; then
   skip="the PR is a draft"
-elif [ "$approved" -gt 0 ] && [ "$reviewed" -gt 0 ]; then
+elif [ "$approved" -gt 0 ]; then
   skip="already approved $head"
 elif [ "$reviewed" -gt 0 ] && [ "$open" -gt 0 ]; then
   skip="already reviewed $head and $open threads are unresolved"
