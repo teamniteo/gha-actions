@@ -43,12 +43,43 @@ class DecisionTest(unittest.TestCase):
         for inputs, reason in [
             ({"CACHED_SKIP": "true"}, "Unchanged code"),
             ({"PATH_MATCH": "false"}, "No changed files"),
-            ({"SCHEDULE_SKIP": "true"}, "configured interval"),
+            ({"SCHEDULE_SKIP": "true", "INTERVAL_DAYS": "7"}, "within 7 days"),
         ]:
             with self.subTest(inputs=inputs):
                 skip, explanation = decision.decide(inputs)
                 self.assertTrue(skip)
                 self.assertIn(reason, explanation)
+
+    def test_run_reason_reports_the_actual_policy(self):
+        env = {
+            "GITHUB_EVENT_NAME": "pull_request",
+            "EVENT_ACTION": "synchronize",
+            "PATH_FILTER": "serverless",
+            "PATH_MATCH": "true",
+            "INTERVAL_DAYS": "0",
+        }
+        self.assertEqual(
+            decision.decide(env),
+            (
+                False,
+                "No reusable successful result; Changed files match filter 'serverless'",
+            ),
+        )
+        env["EVENT_ACTION"] = "opened"
+        self.assertEqual(
+            decision.decide(env)[1],
+            "opened event bypasses result reuse; Changed files match filter 'serverless'",
+        )
+        env.update(PATH_FILTER="", PATH_MATCH="", INTERVAL_DAYS="7")
+        self.assertEqual(
+            decision.decide(env)[1],
+            "opened event bypasses result reuse; No path filter configured; "
+            "No successful execution found within 7 days",
+        )
+        env.update(GITHUB_EVENT_NAME="push", INTERVAL_DAYS="0")
+        self.assertEqual(
+            decision.decide(env)[1], "push event bypasses result reuse and path filters"
+        )
 
     def test_empty_or_matching_rules_run(self):
         for inputs in [{}, {"PATH_MATCH": "true"}, {"GITHUB_RUN_ATTEMPT": "2"}]:

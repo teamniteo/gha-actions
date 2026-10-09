@@ -4,6 +4,8 @@ from pathlib import Path
 
 
 def decide(environment):
+    path_filter = environment.get("PATH_FILTER", "")
+    interval = int(environment.get("INTERVAL_DAYS") or "0")
     if environment.get("ALWAYS_RUN") == "true":
         return False, "This job is configured to always run"
     if environment.get("FULL") == "true":
@@ -11,20 +13,30 @@ def decide(environment):
     if environment.get("CACHED_SKIP") == "true":
         return True, "Unchanged code already passed on the same PR base"
     if environment.get("PATH_MATCH") == "false":
-        return True, "No changed files match this job's path filter"
+        return True, f"No changed files match filter {path_filter!r}"
     if environment.get("SCHEDULE_SKIP") == "true":
-        return True, "A successful execution is within the configured interval"
+        return True, f"A successful execution is within {interval} days"
     if environment.get("GITHUB_RUN_ATTEMPT", "1") != "1":
         return False, "Workflow rerun bypasses result reuse and the schedule"
-    if environment.get("GITHUB_EVENT_NAME") != "pull_request":
-        return (
-            False,
-            "Non-PR run bypasses result reuse and path filters; schedule is due or disabled",
-        )
-    return (
-        False,
-        "No reusable successful result; paths match or are unfiltered; schedule is due or disabled",
-    )
+    event = environment.get("GITHUB_EVENT_NAME", "unknown")
+    if event != "pull_request":
+        reasons = [f"{event} event bypasses result reuse and path filters"]
+    else:
+        action = environment.get("EVENT_ACTION", "synchronize")
+        reasons = [
+            "No reusable successful result"
+            if action == "synchronize"
+            else f"{action} event bypasses result reuse"
+        ]
+        if environment.get("PATH_MATCH") == "true":
+            reasons.append(f"Changed files match filter {path_filter!r}")
+        elif not path_filter:
+            reasons.append("No path filter configured")
+        else:
+            reasons.append(f"Filter {path_filter!r} was not evaluated")
+    if interval:
+        reasons.append(f"No successful execution found within {interval} days")
+    return False, "; ".join(reasons)
 
 
 if __name__ == "__main__":

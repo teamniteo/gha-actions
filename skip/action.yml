@@ -70,6 +70,9 @@ runs:
         FULL: ${{ steps.check.outputs.full }}
         CACHED_SKIP: ${{ steps.check.outputs.skip }}
         CACHE_KEY: ${{ steps.check.outputs.key }}
+        EVENT_ACTION: ${{ github.event.action }}
+        INTERVAL_DAYS: ${{ steps.config.outputs.interval-days }}
+        PATH_FILTER: ${{ steps.config.outputs.filter }}
         SCHEDULE_SKIP: ${{ steps.schedule.outputs.skip }}
         PATH_MATCH: ${{ steps.paths.outputs[steps.config.outputs.filter] }}
       run: python3 "$GITHUB_ACTION_PATH/decision.py"
