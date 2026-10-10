@@ -7,6 +7,7 @@ on:
       - '.github/skip.yml'
       - 'skip/**'
       - 'skip-save/**'
+      - 'nix/**'
   push:
     branches: [main]
     paths:
@@ -14,6 +15,7 @@ on:
       - '.github/skip.yml'
       - 'skip/**'
       - 'skip-save/**'
+      - 'nix/**'
 permissions:
   actions: read
   contents: read
@@ -32,6 +34,7 @@ jobs:
       - run: |
           source skip/setup-python.sh
           "$GHA_SKIP_PYTHON" -m unittest discover -s skip -p 'test_*.py'
+          "$GHA_SKIP_PYTHON" -m unittest discover -s nix -p 'test_*.py'
       - name: Verify saving without a cache key is harmless
         uses: ./skip-save
 

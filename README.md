@@ -57,7 +57,7 @@ On runners with `HOST_CACHE_DIR` and Python 3, **Restore dist cache** and **Save
 
 Entries live under `$HOST_CACHE_DIR/dist`. All configured paths are checkout-relative. Include source inputs, generator code, Nix configuration and toolchain pins. Ignored generated files are excluded. The key includes source contents and declared environment values. Optional `git_dates` Git pathspecs include each matching file's last commit date (`%cs`), matching `make docs`; full Git history is required. Commit hashes are not included. Backend-only changes outside these inputs reuse the build. Saving uses the original key, computed before shell setup.
 
-Symlinks are recreated after restoring outputs so the existing shell hook can skip building. Completed outputs are published atomically; the host clears the cache at boot or after draining. Missing cache infrastructure uses normal setup, including on Namespace. Set `DIST_CACHE_ENABLED: "0"` for deployments.
+Symlinks are recreated after restoring outputs so the existing shell hook can skip building. Completed outputs are published atomically; the host clears the cache at boot or after draining. Missing cache infrastructure uses normal setup, including on Namespace. Set `DIST_CACHE_ENABLED: "0"` for deployments. Including `[ci full]` in the latest PR commit message also disables dist cache restoration and saving for that run, forcing a fresh build. Elm caching remains enabled.
 
 ### Elm cache
 
@@ -335,7 +335,7 @@ Each job calls the same action using its automatically inferred workflow job ID 
 
 Exactly one of `run` or `skip` is present (`true`); the other is empty. `reason` explains the decision in outputs and logs. Jobs absent from the configuration use normal unchanged-tree result reuse without path or schedule rules. Both actions default to `.github/skip.yml`. Set `config` to use a different path, or explicitly set `config: ''` to disable policy rules. `filter: always` bypasses every skip rule and is suitable for commit-message validation.
 
-Include `[ci full]` in the latest PR commit message to bypass result reuse, path filters and schedules. Main/manual runs do not reuse PR results or apply PR path filters. Opening/reopening PRs and workflow reruns bypass result reuse. Reruns also bypass schedules.
+Include `[ci full]` in the latest PR commit message to bypass result reuse, path filters, schedules and the Nix action's dist cache. Main/manual runs do not reuse PR results or apply PR path filters. Opening/reopening PRs and workflow reruns bypass result reuse. Reruns also bypass schedules.
 
 Successful results match repository, PR, base, merged tree, workflow job ID, canonical matrix values and runner platform. The host-cache is checked first; GitHub artifacts are the fallback. The fallback requires a successful source workflow because the API does not expose workflow job IDs for matching individual results. GitHub errors and cache misses run checks normally.
 
