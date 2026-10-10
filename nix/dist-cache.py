@@ -96,6 +96,17 @@ def restore(state):
     if not config_path.is_file():
         print("Dist cache skipped: .github/dist-cache.json is absent", flush=True)
         return
+    if os.environ.get("GITHUB_EVENT_NAME") == "pull_request":
+        event = json.loads(Path(os.environ["GITHUB_EVENT_PATH"]).read_text())
+        # Checkout normally points at a merge commit; inspect the actual PR head.
+        message = subprocess.check_output(
+            ["git", "-C", str(root), "log", "-1", "--format=%B",
+             event["pull_request"]["head"]["sha"]],
+            text=True,
+        )
+        if "[ci full]" in message:
+            print("Dist cache skipped: forced by [ci full] in the latest PR commit", flush=True)
+            return
     config = json.loads(config_path.read_text())
     outputs = [str(relative_path(path)) for path in config["outputs"]]
     symlinks = {str(relative_path(link)): str(relative_path(target))
