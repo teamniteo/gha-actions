@@ -38,7 +38,7 @@ runs:
         sudo mkdir /nix
         sudo chown $USER /nix
 
-    - uses: namespacelabs/nscloud-cache-action@v1.2.13
+    - uses: namespacelabs/nscloud-cache-action@1124a6f3ce44e5cf84cc22111530961f4d2a15f9 # v1.7.0
       if: env.NAMESPACE_RUNNER
       with:
         path: |
@@ -68,7 +68,7 @@ runs:
 
         echo "value=$value" >> "$GITHUB_OUTPUT"
 
-    - uses: cachix/install-nix-action@v27
+    - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
       if: ${{ !env.NIXOS_RUNNER }}
       with:
         nix_path: ${{ steps.nix_path.outputs.value }}
@@ -82,7 +82,7 @@ runs:
 
     # The cache only speeds things up. Its push runs as this step's post
     # phase, and a failed push must not fail a job that built fine.
-    - uses: cachix/cachix-action@v17
+    - uses: cachix/cachix-action@38b082610b782e7e93e209c35fd730d399dee866 # v17
       continue-on-error: true
       with:
         name: ${{ inputs.cache }}
