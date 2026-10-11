@@ -221,7 +221,7 @@ jobs:
 
 # Codex Review Action
 
-Reviews PRs against the same conventions as Claude, posts inline findings, answers `@codex-niteo` questions, and approves when its threads are resolved. Use a GitHub App installation token as `github_token`; the default bot name is `codex-niteo` (override with `bot_name`). The App needs Contents: read, Pull requests: write, Issues: write, and Commit statuses: write. Optional inputs: `rules` (default: `conventions backend frontend alembic`) and `model` (default: `gpt-6-sol`).
+Reviews PRs against the same conventions as Claude, posts inline findings, answers `@codex-niteo` questions, and approves when its threads are resolved. Use a GitHub App installation token as `github_token`; the default bot name is `codex-niteo` (override with `bot_name`). The App needs Contents: read, Pull requests: write, Issues: write, and Commit statuses: write. Optional inputs: `rules` (default: `conventions backend frontend alembic`) and `model` (default: `gpt-6.1-sol`).
 
 Use a trusted private runner with Codex configured, `gh`, Python, and an unprivileged user without passwordless sudo. Pass its persistent directory as `codex_home` and use the runner-provided `codex` executable on `PATH`. The container provides isolation; Codex's inner sandbox is disabled. GitHub tokens are withheld from Codex and used by a separate publishing step. Confirmed authentication failures create `auth-required` in `codex_home` for the runner administrator to disable Codex eligibility until re-login.
 
