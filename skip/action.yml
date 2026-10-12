@@ -12,7 +12,7 @@ outputs:
     description: Human-readable explanation of the run or skip decision, also printed in logs.
     value: ${{ steps.decision.outputs.reason }}
   full:
-    description: Whether the latest PR commit message contains [ci full]. Bypass path filters and other skip rules when true.
+    description: Whether the PR has the ci-full label. Bypass path filters and other skip rules when true.
     value: ${{ steps.check.outputs.full }}
   skip:
     description: Present (true) when the job should skip; empty when it should run.

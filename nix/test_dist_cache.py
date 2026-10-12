@@ -45,7 +45,7 @@ class DistCacheTest(unittest.TestCase):
         (self.repo / "source.txt").write_text("source")
         self.git("add", ".")
         self.git("commit", "--quiet", "-m", "Initial")
-        self.set_pr_head()
+        self.set_pr_labels()
         cache.restore(self.state)
         self.entry = Path(json.loads(self.state.read_text())["entry"])
         (self.repo / "dist").mkdir()
@@ -61,15 +61,13 @@ class DistCacheTest(unittest.TestCase):
             *args,
         ], text=True).strip()
 
-    def set_pr_head(self):
+    def set_pr_labels(self, *names):
         self.event.write_text(json.dumps({
-            "pull_request": {"head": {"sha": self.git("rev-parse", "HEAD")}},
+            "pull_request": {"labels": [{"name": name} for name in names]},
         }))
 
-    def test_full_pr_head_bypasses_warm_cache_and_save(self):
-        self.git("commit", "--quiet", "--allow-empty", "-m", "Rebuild\n\n[ci full]")
-        self.set_pr_head()
-        self.git("commit", "--quiet", "--allow-empty", "-m", "Synthetic merge")
+    def test_full_label_bypasses_warm_cache_and_save(self):
+        self.set_pr_labels("self-hosted", "ci-full")
         # A previous invocation's state must not cause publication on this run.
         self.state.write_text(json.dumps({
             "root": str(self.repo), "entry": str(self.entry), "outputs": ["dist"],
@@ -81,11 +79,17 @@ class DistCacheTest(unittest.TestCase):
         cache.save(self.state)
         self.assertEqual((self.entry / "dist/output.txt").read_text(), "cached build")
 
-    def test_only_latest_pr_commit_controls_override(self):
-        self.git("commit", "--quiet", "--allow-empty", "-m", "Old [ci full]")
-        self.git("commit", "--quiet", "--allow-empty", "-m", "Ordinary PR head")
-        self.set_pr_head()
-        self.git("commit", "--quiet", "--allow-empty", "-m", "Merge [ci full]")
+    def test_commit_message_does_not_control_override(self):
+        self.git("commit", "--quiet", "--allow-empty", "-m", "Rebuild [ci full]")
+        self.set_pr_labels("self-hosted", "ci-full-extra")
+        cache.restore(self.state)
+        self.assertEqual((self.repo / "static/output.txt").read_text(), "cached build")
+
+    def test_removing_label_restores_cache(self):
+        self.set_pr_labels("ci-full")
+        cache.restore(self.state)
+        self.assertFalse((self.repo / "dist").exists())
+        self.set_pr_labels()
         cache.restore(self.state)
         self.assertEqual((self.repo / "static/output.txt").read_text(), "cached build")
 

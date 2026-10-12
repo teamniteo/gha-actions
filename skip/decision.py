@@ -9,7 +9,7 @@ def decide(environment):
     if environment.get("ALWAYS_RUN") == "true":
         return False, "This job is configured to always run"
     if environment.get("FULL") == "true":
-        return False, "Forced by [ci full] in the latest PR commit"
+        return False, "Forced by ci-full PR label"
     if environment.get("CACHED_SKIP") == "true":
         return True, "Unchanged code already passed on the same PR base"
     if environment.get("PATH_MATCH") == "false":
