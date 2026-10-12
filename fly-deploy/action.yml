@@ -31,10 +31,10 @@ inputs:
     default:
   strategy:
     description: >-
-      How app Machines get the new image. "stop" cordons and stops them before deployment, then starts and uncordons them. "rolling" replaces them one at a time. "auto" uses stop for review apps (REVIEWAPP=true in secrets); otherwise it compares incoming Alembic heads with the deployed PostgreSQL database, rolling when they match and stopping otherwise.
+      How app Machines get the new image. "stop" cordons and stops them before deployment, then starts and uncordons them. "rolling" replaces them one at a time. "auto" uses stop for review apps (REVIEWAPP=true in secrets) or when Alembic is unavailable; otherwise it compares incoming Alembic heads with the deployed PostgreSQL database, rolling when they match and stopping otherwise.
     default: auto
   alembic-config:
-    description: Alembic config relative to project, used by strategy auto outside review apps. Requires Alembic on the runner and psql plus DATABASE_URL on the deployed Machine (PostgreSQL, public.alembic_version).
+    description: Alembic config relative to project, used by strategy auto outside review apps when Alembic is on the runner. Database comparison requires psql plus DATABASE_URL on the deployed Machine (PostgreSQL, public.alembic_version).
     default: etc/production.ini
 
 outputs:

@@ -20,6 +20,14 @@ if grep -Eq '^REVIEWAPP=true[[:space:]]*$' <<< "${SECRETS:-}"; then
     exit 0
 fi
 
+# Non-Alembic apps can use the default strategy too. Without migration
+# information, use the same conservative fallback as an unavailable database.
+if ! command -v alembic >/dev/null 2>&1; then
+    echo "Alembic is not available; using stop."
+    echo "strategy=stop" >> "$GITHUB_OUTPUT"
+    exit 0
+fi
+
 heads=$(alembic -c "$ALEMBIC_CONFIG" heads | awk '{print $1}' | sort)
 selected_strategy=stop
 # Query the running app's database, not the previous Git commit: deployments

@@ -2,6 +2,7 @@
 
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -120,6 +121,17 @@ class StrategyTests(unittest.TestCase):
     def test_invalid_strategy_fails(self):
         self.assertNotEqual(self.select(STRATEGY="typo").returncode, 0)
         self.assertFalse(self.output.exists())
+        self.assertFalse(self.log.exists())
+
+    def test_missing_alembic_stops_without_database_probe(self):
+        (self.root / "alembic").unlink()
+        # Isolate PATH so an Alembic installed on the test runner cannot leak in.
+        for name in ("bash", "grep"):
+            (self.root / name).symlink_to(shutil.which(name))
+        result = self.select(PATH=str(self.root))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.output.read_text(), "strategy=stop\n")
+        self.assertIn("Alembic is not available", result.stdout)
         self.assertFalse(self.log.exists())
 
     def test_invalid_local_config_fails_before_ssh(self):
