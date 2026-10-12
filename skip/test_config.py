@@ -64,6 +64,21 @@ jobs:
             with self.subTest(rule=rule), self.assertRaises(ValueError):
                 policy.resolve({"jobs": {"job": rule}}, "job", {})
 
+    def test_glob_syntax_outside_the_fingerprint_matcher_is_rejected(self):
+        for pattern in [
+            "{backend,frontend}/**",
+            "test_[a-f]*.py",
+            "!(vendor)/**",
+            "+(a|b).js",
+            "src/!important.txt",
+            "docs/\\*.md",
+        ]:
+            with self.subTest(pattern=pattern), self.assertRaisesRegex(
+                ValueError, "Unsupported glob syntax"
+            ):
+                policy.resolve({"filters": {"app": ["**", pattern]}}, "job", {})
+        policy.resolve({"filters": {"app": ["**", "!**/tests/test_*.py"]}}, "job", {})
+
     def test_always_cannot_be_redefined_as_a_path_filter(self):
         with self.assertRaisesRegex(ValueError, "reserved"):
             policy.resolve({"filters": {"always": ["!**"]}}, "job", {})

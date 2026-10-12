@@ -1,8 +1,14 @@
 import json
 import os
+import re
 from pathlib import Path
 
 import yaml
+
+# Result reuse fingerprints files with a matcher that only implements **, * and ?,
+# so braces, brackets, extglobs and escapes must be rejected rather than matched
+# differently from dorny/paths-filter.
+UNSUPPORTED_GLOB = re.compile(r"[\[\]{}()\\+@!]")
 
 
 def resolve(config, job, matrix):
@@ -11,6 +17,9 @@ def resolve(config, job, matrix):
     selected = rule.get("filter", "")
     if "always" in filters:
         raise ValueError("always is a reserved filter name")
+    for pattern in (p for patterns in filters.values() for p in patterns):
+        if UNSUPPORTED_GLOB.search(pattern.removeprefix("!")):
+            raise ValueError(f"Unsupported glob syntax in filter pattern {pattern!r}")
     if "always-run" in rule:
         raise ValueError("Use filter: always for jobs that must always run")
     if selected and selected != "always" and selected not in filters:

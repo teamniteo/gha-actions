@@ -42,6 +42,8 @@ runs:
       env:
         ALWAYS_RUN: ${{ steps.config.outputs.always-run }}
         MATRIX_JSON: ${{ toJSON(matrix) }}
+        PATH_FILTER: ${{ steps.config.outputs.filter }}
+        PATH_FILTERS: ${{ steps.config.outputs.filters }}
         GH_TOKEN: ${{ github.token }}
       run: python3 "$GITHUB_ACTION_PATH/cache.py" check
 
