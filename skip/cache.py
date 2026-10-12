@@ -41,6 +41,59 @@ def remember(key, source):
         print(f"Host cache unavailable: {error}")
 
 
+GLOB_TOKEN = re.compile(r"\*\*/|/\*\*$|\*\*|\*|\?|/|[^*?/]+")
+GLOB_REGEX = {
+    "**/": "(?:.*/)?",
+    "/**": "(?:/.*)?",
+    "**": ".*",
+    "*": "[^/]*",
+    "?": "[^/]",
+}
+
+
+def glob_regex(pattern):
+    return "".join(
+        GLOB_REGEX.get(token, re.escape(token))
+        for token in GLOB_TOKEN.findall(pattern)
+    )
+
+
+def selected(path, rules):
+    included = False
+    for exclude, regex in rules:
+        if regex.fullmatch(path):
+            if exclude:
+                return False
+            included = True
+    return included
+
+
+def git(*args):
+    return subprocess.check_output(
+        ["git", "-C", os.environ["GITHUB_WORKSPACE"], *args], text=True
+    )
+
+
+def fingerprint(patterns):
+    """Hash the merged tree, restricted to the files the job's filter selects.
+
+    Mirrors dorny/paths-filter's some-with-excludes matching so a job reuses
+    results whenever none of the files that can trigger it changed.
+    """
+    if not patterns:
+        return git("rev-parse", "HEAD^{tree}").strip()
+    rules = [
+        (pattern.startswith("!"), re.compile(glob_regex(pattern.removeprefix("!"))))
+        for pattern in patterns
+    ]
+    entries = [
+        entry
+        for entry in git("ls-tree", "-r", "-z", "HEAD").split("\0")
+        if entry and selected(entry.split("\t", 1)[1], rules)
+    ]
+    return hashlib.sha256("\0".join(entries).encode()).hexdigest()
+
+
 def full_override():
     if os.environ["GITHUB_EVENT_NAME"] != "pull_request":
         return False
@@ -62,15 +115,15 @@ def check(full=None):
         return False, "", {}
     event = json.loads(Path(os.environ["GITHUB_EVENT_PATH"]).read_text())
     pr = event["pull_request"]
-    tree = subprocess.check_output(
-        ["git", "-C", os.environ["GITHUB_WORKSPACE"], "rev-parse", "HEAD^{tree}"],
-        text=True,
-    ).strip()
+    filters = json.loads(os.environ.get("PATH_FILTERS") or "{}")
+    patterns = filters.get(os.environ.get("PATH_FILTER", ""), [])
+    tree = fingerprint(patterns)
     identity = [
         os.environ["GITHUB_REPOSITORY"],
         os.environ["GITHUB_WORKFLOW_REF"].split("@")[0],
         pr["number"],
         pr["base"]["sha"],
+        patterns,
         tree,
         os.environ["GITHUB_JOB"],
         json.loads(os.environ.get("MATRIX_JSON") or "null"),

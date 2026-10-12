@@ -1,6 +1,7 @@
 import importlib.util
 import json
 import os
+import re
 import subprocess
 import tempfile
 import unittest
@@ -140,6 +141,103 @@ class ReuseChecksTest(unittest.TestCase):
             skip, changed_key, _ = check()
             self.assertFalse(skip)
             self.assertNotEqual(changed_key, key)
+
+    def test_filtered_fingerprint_ignores_files_outside_the_filter(self):
+        repo = self.root / "repo"
+        repo.mkdir()
+
+        def git(*args):
+            return subprocess.check_output(
+                [
+                    "git",
+                    "-C",
+                    str(repo),
+                    "-c",
+                    "user.name=CI test",
+                    "-c",
+                    "user.email=ci@example.invalid",
+                    "-c",
+                    "commit.gpgsign=false",
+                    "-c",
+                    "core.hooksPath=/dev/null",
+                    *args,
+                ],
+                text=True,
+            ).strip()
+
+        def commit(path, content):
+            (repo / path).parent.mkdir(parents=True, exist_ok=True)
+            (repo / path).write_text(content)
+            git("add", path)
+            git("commit", "--quiet", "-m", path)
+            self.event["pull_request"]["head"]["sha"] = git("rev-parse", "HEAD")
+            Path(os.environ["GITHUB_EVENT_PATH"]).write_text(json.dumps(self.event))
+            return module.check()[1]
+
+        git("init", "--quiet")
+        filters = json.dumps({"backend": ["**", "!*.md", "!documentation/**"]})
+        with (
+            patch.dict(
+                os.environ,
+                {
+                    "GITHUB_WORKSPACE": str(repo),
+                    "PATH_FILTERS": filters,
+                    "PATH_FILTER": "backend",
+                },
+            ),
+            patch.object(module, "api", return_value={"artifacts": []}),
+        ):
+            original = commit("backend/app.py", "code\n")
+            self.assertEqual(commit("documentation/guide.md", "docs\n"), original)
+            self.assertEqual(commit("README.md", "readme\n"), original)
+            self.assertNotEqual(commit("backend/app.py", "changed\n"), original)
+            self.assertNotEqual(commit("docs/nested.md", "nested\n"), original)
+
+            with patch.dict(os.environ, {"PATH_FILTER": ""}):
+                unfiltered = module.check()[1]
+                self.assertNotEqual(
+                    commit("documentation/guide.md", "v3\n"), unfiltered
+                )
+
+    def test_glob_matching_mirrors_paths_filter(self):
+        cases = [
+            ("**", "a/b/.c", True),
+            ("*.md", "README.md", True),
+            ("*.md", "docs/README.md", False),
+            ("documentation/**", "documentation/a/b.md", True),
+            ("documentation/**", "documentation", True),
+            ("documentation/**", "documentation.md", False),
+            ("**/tests/test_*.py", "tests/test_a.py", True),
+            ("**/tests/test_*.py", "src/x/tests/test_a.py", True),
+            ("**/tests/test_*.py", "src/x/tests/sub/test_a.py", False),
+            ("backend/src/**/tests/test_*.py", "backend/src/tests/test_a.py", True),
+            ("backend/src/**/tests/test_*.py", "backend/src/a/tests/test_a.py", True),
+            ("backend/src/**/tests/test_*.py", "backend/src/a/tests/a.py", False),
+            (".github/workflows/ci.yml", ".github/workflows/ci.yml", True),
+            (".github/workflows/ci.yml", ".github/workflows/ci.yaml", False),
+            ("a?c", "abc", True),
+            ("a?c", "a/c", False),
+            ("a.b", "aXb", False),
+        ]
+        for pattern, path, expected in cases:
+            with self.subTest(pattern=pattern, path=path):
+                regex = re.compile(module.glob_regex(pattern))
+                self.assertEqual(bool(regex.fullmatch(path)), expected)
+
+    def test_excludes_win_and_a_file_needs_an_include(self):
+        rules = [
+            (exclude, re.compile(module.glob_regex(body)))
+            for exclude, body in [
+                (False, "backend/**"),
+                (True, "backend/**/tests/**"),
+                (False, "docs/*.md"),
+            ]
+        ]
+        self.assertTrue(module.selected("backend/app.py", rules))
+        self.assertFalse(module.selected("backend/app/tests/test_a.py", rules))
+        self.assertTrue(module.selected("docs/a.md", rules))
+        self.assertFalse(module.selected("frontend/app.elm", rules))
+        self.assertFalse(module.selected("docs/a.md", rules[1:2]))
 
     def test_always_run_bypasses_warm_cache(self):
         self.evaluate()

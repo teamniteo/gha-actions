@@ -347,7 +347,7 @@ on:
     types: [opened, synchronize, reopened, labeled, unlabeled]
 ```
 
-Successful results match repository, PR, base, merged tree, workflow job ID, canonical matrix values and runner platform. The host-cache is checked first; GitHub artifacts are the fallback. The fallback requires a successful source workflow because the API does not expose workflow job IDs for matching individual results. GitHub errors and cache misses run checks normally.
+Successful results match repository, PR, base, workflow job ID, canonical matrix values, runner platform and the merged tree restricted to the files the job's path filter selects, so a change outside the filter, such as a documentation edit on a backend-only PR, keeps reusing the earlier result. Filter patterns may use `**`, `*` and `?`; braces, brackets, extglobs and escapes fail the policy check instead of matching differently from the path filter. The host-cache is checked first; GitHub artifacts are the fallback. The fallback requires a successful source workflow because the API does not expose workflow job IDs for matching individual results. GitHub errors and cache misses run checks normally.
 
 Schedule selectors match matrix values exactly. Use a repository-wide unique artifact name for each schedule. Only actual executions publish interval markers; skipped runs never postpone the interval. The source workflow must have succeeded. Both actions read the same policy file and infer schedules by job ID and matrix values. `skip` records the original result key in the job environment before tests can modify files. `skip-save` reads that key automatically and handles empty keys and interval markers internally and must run only after successful validation, never with `always()`.
 
