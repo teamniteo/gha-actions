@@ -11,6 +11,15 @@ case "$STRATEGY" in
     *) echo "::error::strategy must be stop, rolling or auto, not '$STRATEGY'"; exit 1 ;;
 esac
 
+# Review apps can scale to zero between the database probe and the rollout.
+# Rolling may leave those Machines stopped and time out on their health checks.
+# Use the existing review-app secret so callers can keep the default strategy.
+if grep -Eq '^REVIEWAPP=true[[:space:]]*$' <<< "${SECRETS:-}"; then
+    echo "Review app: using stop so Machines are started after deployment."
+    echo "strategy=stop" >> "$GITHUB_OUTPUT"
+    exit 0
+fi
+
 heads=$(alembic -c "$ALEMBIC_CONFIG" heads | awk '{print $1}' | sort)
 selected_strategy=stop
 # Query the running app's database, not the previous Git commit: deployments

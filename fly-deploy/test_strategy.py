@@ -48,6 +48,7 @@ class StrategyTests(unittest.TestCase):
             "GITHUB_OUTPUT": str(self.output),
             "APP": "test-app",
             "STRATEGY": "auto",
+            "SECRETS": "",
             "ALEMBIC_CONFIG": "config with spaces.ini",
             "DATABASE_URL": "runner-database-must-not-be-used",
         }
@@ -84,11 +85,34 @@ class StrategyTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(self.output.read_text(), "strategy=rolling\n")
 
+    def test_review_apps_stop_without_probing_or_local_alembic(self):
+        for secrets in (
+            "REVIEWAPP=true",
+            "DATABASE_URL=private\nREVIEWAPP=true\nOTHER=secret\n",
+            "REVIEWAPP=true\r\nOTHER=secret\r\n",
+        ):
+            with self.subTest(secrets=secrets):
+                self.output.unlink(missing_ok=True)
+                result = self.select(SECRETS=secrets, HEADS_STATUS="1", SSH_STATUS="1")
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(self.output.read_text(), "strategy=stop\n")
+                self.assertFalse(self.log.exists())
+                self.assertNotIn("private", result.stdout + result.stderr)
+                self.assertNotIn("secret", result.stdout + result.stderr)
+
+    def test_other_secrets_do_not_mark_review_apps(self):
+        for secrets in ("REVIEWAPP=false", "OTHER_REVIEWAPP=true", "OTHER=REVIEWAPP=true"):
+            with self.subTest(secrets=secrets):
+                self.output.unlink(missing_ok=True)
+                result = self.select(SECRETS=secrets)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(self.output.read_text(), "strategy=rolling\n")
+
     def test_explicit_strategies_skip_database_checks(self):
         for strategy in ("stop", "rolling"):
             with self.subTest(strategy=strategy):
                 self.output.unlink(missing_ok=True)
-                result = self.select(STRATEGY=strategy)
+                result = self.select(STRATEGY=strategy, SECRETS="REVIEWAPP=true")
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertEqual(self.output.read_text(), f"strategy={strategy}\n")
                 self.assertFalse(self.log.exists())
