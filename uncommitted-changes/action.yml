@@ -9,7 +9,7 @@ inputs:
 runs:
   using: "composite"
   steps:
-    - uses: tj-actions/verify-changed-files@a1c6acee9df209257a246f2cc6ae8cb6581c1edf # v20.0.4
+    - uses: tj-actions/verify-changed-files@7517b838f3a0d51de4b334a61ef1330672118927 # v14.0.2
       id: verify-changed-files
       with:
           files: ${{ inputs.files }}
