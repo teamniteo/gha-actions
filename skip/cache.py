@@ -45,19 +45,10 @@ def full_override():
     if os.environ["GITHUB_EVENT_NAME"] != "pull_request":
         return False
     event = json.loads(Path(os.environ["GITHUB_EVENT_PATH"]).read_text())
-    message = subprocess.check_output(
-        [
-            "git",
-            "-C",
-            os.environ["GITHUB_WORKSPACE"],
-            "log",
-            "-1",
-            "--format=%B",
-            event["pull_request"]["head"]["sha"],
-        ],
-        text=True,
+    return any(
+        label["name"] == "ci-full"
+        for label in event["pull_request"].get("labels", [])
     )
-    return "[ci full]" in message
 
 
 def check(full=None):

@@ -129,8 +129,11 @@ class ReuseChecksTest(unittest.TestCase):
             self.assertEqual(check()[:2], (True, key))
 
             git("commit", "--quiet", "--amend", "-m", "Squashed [ci full]")
+            self.assertEqual(check()[:2], (True, key))
+            self.event["pull_request"]["labels"] = [{"name": "ci-full"}]
             self.assertEqual(check(), (False, "", {}))
-            git("commit", "--quiet", "--amend", "-m", "Squashed")
+            self.event["pull_request"]["labels"] = []
+            self.assertEqual(check()[:2], (True, key))
 
             source.write_text("changed code\n")
             git("commit", "--quiet", "-am", "Changed code")
@@ -146,32 +149,33 @@ class ReuseChecksTest(unittest.TestCase):
             self.assertEqual(calls, [])
 
     def test_full_override_bypasses_all_caches(self):
+        self.evaluate()
+        self.event["pull_request"]["labels"] = [
+            {"name": "self-hosted"}, {"name": "ci-full"},
+        ]
         Path(os.environ["GITHUB_EVENT_PATH"]).write_text(json.dumps(self.event))
         with (
-            patch.object(
-                module.subprocess,
-                "check_output",
-                return_value="chore: rerun\n\n[ci full]",
-            ),
+            patch.object(module.subprocess, "check_output") as git,
             patch.object(module, "api") as api,
         ):
             self.assertTrue(module.full_override())
             self.assertEqual(module.check(), (False, "", {}))
+            git.assert_not_called()
             api.assert_not_called()
 
-    def test_full_override_only_reads_latest_pr_commit(self):
+    def test_full_override_requires_exact_label(self):
+        for labels in [[], [{"name": "self-hosted"}], [{"name": "ci-full-extra"}]]:
+            with self.subTest(labels=labels):
+                self.event["pull_request"]["labels"] = labels
+                Path(os.environ["GITHUB_EVENT_PATH"]).write_text(json.dumps(self.event))
+                self.assertFalse(module.full_override())
+
+    def test_full_override_only_applies_to_pr_events(self):
+        self.event["pull_request"]["labels"] = [{"name": "ci-full"}]
         Path(os.environ["GITHUB_EVENT_PATH"]).write_text(json.dumps(self.event))
-        with patch.object(
-            module.subprocess, "check_output", return_value="ordinary message"
-        ) as git:
-            self.assertFalse(module.full_override())
-            self.assertEqual(git.call_args.args[0][-1], "head")
-        with (
-            patch.dict(os.environ, {"GITHUB_EVENT_NAME": "push"}),
-            patch.object(module.subprocess, "check_output") as git,
-        ):
-            self.assertFalse(module.full_override())
-            git.assert_not_called()
+        for event in ["push", "workflow_dispatch"]:
+            with patch.dict(os.environ, {"GITHUB_EVENT_NAME": event}):
+                self.assertFalse(module.full_override())
 
     def test_github_fallback_populates_host_cache(self):
         (skip, key, source), calls = self.evaluate()
