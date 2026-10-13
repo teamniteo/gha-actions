@@ -84,7 +84,12 @@ runs:
         SHA: ${{ inputs.sha }}
       run: |
         ./result > "$RUNNER_TEMP/image.tar"
-        skopeo --insecure-policy copy --retry-times 3 --dest-creds "x:$FLY_API_TOKEN" "docker-archive:$RUNNER_TEMP/image.tar" "docker://registry.fly.io/$APP:$SHA"
+        # The archive holds the layers uncompressed, and the registry knows
+        # them by the digest of their compressed form, which skopeo only
+        # learns as it uploads; so without precomputing the digests every
+        # layer went up again on every deploy (a minute for a 350 MB
+        # dependency layer the registry already had).
+        skopeo --insecure-policy copy --retry-times 3 --dest-precompute-digests --dest-creds "x:$FLY_API_TOKEN" "docker-archive:$RUNNER_TEMP/image.tar" "docker://registry.fly.io/$APP:$SHA"
 
     - name: Stage the secrets
       if: ${{ inputs.secrets != '' }}
