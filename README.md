@@ -142,6 +142,8 @@ Configure the release command, service health checks and graceful shutdown in `b
       token: ${{ secrets.FLY_API_TOKEN }}
 ```
 
+After a stop deployment, recovery attempts every app Machine even when another Machine fails to start. Each recovered Machine is uncordoned immediately. Failed starts, waits and uncordons are retried up to three times, and any remaining failures fail the action. Release-command Machines are excluded.
+
 The image is tagged with the commit it was built from (`sha`, defaulting to the pull request head, the `workflow_run` head or `github.sha`), which the app also gets as `GIT_COMMIT`, next to `DEPLOYED_AT`. Pass `org` to create the app when it does not exist yet, which is what a review app needs, and `secrets` to stage `KEY=VALUE` lines before the deploy. The action outputs the app's `url` and waits for it to respond, failing the deployment if it remains unavailable after bounded retries.
 
 ```yaml

@@ -160,18 +160,7 @@ runs:
       env:
         APP: ${{ inputs.app }}
         FLY_API_TOKEN: ${{ inputs.token }}
-      run: |
-        # Never restart a release-command Machine: it would rerun migrations.
-        machines=$(flyctl machine list -a "$APP" --json | jq '[.[] | select(.config.metadata.fly_process_group != "fly_app_release_command")]')
-        while read -r id state; do
-          if [[ "$state" != started ]]; then
-            flyctl machine start "$id" -a "$APP"
-          fi
-          flyctl machine wait "$id" -a "$APP" --state started --wait-timeout 1m
-        done < <(jq -r '.[] | "\(.id) \(.state)"' <<< "$machines")
-        for id in $(jq -r '.[].id' <<< "$machines"); do
-          flyctl machine uncordon "$id" -a "$APP"
-        done
+      run: bash "${{ github.action_path }}/start.sh"
 
     - name: Check the app
       shell: bash

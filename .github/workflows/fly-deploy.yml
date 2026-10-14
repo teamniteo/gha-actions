@@ -1,0 +1,20 @@
+name: Fly deploy tests
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/fly-deploy.yml'
+      - 'fly-deploy/**'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/fly-deploy.yml'
+      - 'fly-deploy/**'
+permissions:
+  contents: read
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: python3 -m unittest discover -s fly-deploy -p 'test_*.py'
+      - run: bash -n fly-deploy/*.sh
