@@ -91,7 +91,7 @@ runs:
         if [ -n "$MODEL" ]; then
           args+=(--model "$MODEL")
         fi
-        python3 "$ACTION_PATH/run.py" "${args[@]}" - <<< "$PROMPT" > "$EVENTS"
+        python3 "$ACTION_PATH/run.py" "${args[@]}" - <<< "$PROMPT" | tee "$EVENTS"
 
     - name: Publish Codex's review
       if: steps.check.outputs.run == 'true'
