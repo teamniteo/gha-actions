@@ -75,10 +75,10 @@ fi
 echo "$AUTHOR: $mode ($skip)"
 
 if [ "$mode" != skip ]; then
-rev=$(jq -r '.nodes["niteo-claude"].locked.rev // "main"' nix/flake.lock 2>/dev/null || echo main)
-echo "teamniteo/claude@$rev: $RULES"
+rev=$(jq -r '.nodes["niteo-agents"].locked.rev // "main"' nix/flake.lock 2>/dev/null || echo main)
+echo "teamniteo/agents@$rev: $RULES"
 for rule in $RULES; do
   curl -fsSL -o "$CONTEXT/rules/$rule.md" \
-    "https://raw.githubusercontent.com/teamniteo/claude/$rev/rules/$rule.md"
+    "https://raw.githubusercontent.com/teamniteo/agents/$rev/rules/$rule.md"
 done
 fi

@@ -14,7 +14,7 @@ inputs:
     description: Codex model ID to use for reviews.
     default: "gpt-6.1-sol"
   rules:
-    description: Rules from teamniteo/claude to review against.
+    description: Rules from teamniteo/agents to review against.
     default: "conventions backend frontend alembic"
 runs:
   using: composite

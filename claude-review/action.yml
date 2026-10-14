@@ -10,7 +10,7 @@ inputs:
     description: Token from `claude setup-token`.
     required: true
   rules:
-    description: Rules from teamniteo/claude to review against.
+    description: Rules from teamniteo/agents to review against.
     default: "conventions backend frontend alembic"
 
 runs:
