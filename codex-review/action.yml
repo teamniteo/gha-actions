@@ -46,8 +46,10 @@ runs:
       env:
         GH_TOKEN: ${{ inputs.github_token }}
         PR: ${{ github.event.pull_request.number || github.event.issue.number }}
+        REPO: ${{ github.repository }}
         CONTEXT: ${{ runner.temp }}/codex-review-context
-      run: gh pr diff "$PR" > "$CONTEXT/diff.patch"
+        ACTION_PATH: ${{ github.action_path }}
+      run: bash "$ACTION_PATH/../review-context/diff.sh"
 
     - name: Review with Codex
       if: steps.check.outputs.run == 'true'
