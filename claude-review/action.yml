@@ -91,7 +91,7 @@ runs:
           --add-dir ${{ runner.temp }}/review-context
           --mcp-config '{"mcpServers": {"github_reply": {"command": "docker",
           "args": ["run", "-i", "--rm", "-e", "GITHUB_PERSONAL_ACCESS_TOKEN",
-          "ghcr.io/github/github-mcp-server:v2.0.1@sha256:03f565ea952662cd14a8a0373d910aeced3aff7197ab6afef786755db8d25994",
+          "ghcr.io/github/github-mcp-server:v2.0.3@sha256:250bc6ce70788207608ef74cef4397230ff2e8481218da74d6093e4bd9101132",
           "stdio", "--tools", "add_reply_to_pull_request_comment"],
           "env": {"GITHUB_PERSONAL_ACCESS_TOKEN": "${GH_TOKEN}"}}}}'
           --allowedTools "mcp__github_inline_comment__create_inline_comment,mcp__github_reply__add_reply_to_pull_request_comment,Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr comment:*),Read,Glob,Grep${{ steps.check.outputs.mode == 'review' && steps.check.outputs.open == '0' && ',Bash(gh pr review:*)' || '' }}"
