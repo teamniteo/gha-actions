@@ -55,7 +55,7 @@ runs:
         fi
 
     - id: claude
-      uses: anthropics/claude-code-action@925afb53776cf1a2b738c6bdbed37b4d4000ef13 # v1.0.262
+      uses: anthropics/claude-code-action@d535f5172dec02b204866b393d6b20b9b2aaf98d # v1.0.266
       if: steps.check.outputs.run == 'true'
       env:
         # Keep the OAuth token out of the shell commands Claude runs.
