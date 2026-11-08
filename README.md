@@ -61,7 +61,7 @@ Symlinks are recreated after restoring outputs so the existing shell hook can sk
 
 ### Elm cache
 
-On host-cache runners, Elm always uses a private temporary `ELM_HOME`. **Restore Elm cache** copies a completed snapshot from `$HOST_CACHE_DIR/elm`; **Save Elm cache** publishes one atomically after successful shell setup. Snapshots are keyed by tracked `elm.json` files, `nix/`, root Nix configuration, repository and runner platform. Jobs never write into a shared package tree. No project configuration is needed; Namespace keeps its existing cache setup.
+On host-cache runners, Elm always uses a private temporary `ELM_HOME`. **Restore Elm cache** copies a completed snapshot from `$HOST_CACHE_DIR/elm`; **Save Elm cache** publishes one atomically after successful shell setup. Snapshots are keyed by tracked `elm.json` files, repository and runner platform. Nix configuration stays out of the key because `ELM_HOME` keeps each compiler version under its own directory, so a weekly nixpkgs bump keeps every snapshot. When no snapshot matches, the newest one for the same repository and platform is restored instead: extra packages are harmless, so only new packages download, and a snapshot is published only when the job compiled packages it did not restore. Jobs never write into a shared package tree. No project configuration is needed; Namespace keeps its existing cache setup.
 
 # Debug Shell Action
 
