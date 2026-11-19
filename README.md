@@ -108,6 +108,23 @@ Or multiple files likes:
               !mockups/*.bmpr
 ```
 
+# Actions Lock Action
+
+This GitHub Action fails when `.github/workflows/actions.lock` no longer matches the workflows, or when a locked commit no longer verifies upstream. It runs `gh-actions-lock --verify`, and needs neither `gh` nor nix.
+
+```yaml
+  - uses: actions/checkout@v7
+    with:
+      persist-credentials: false
+
+  - name: Verify actions.lock
+    uses: teamniteo/gha-actions/actions-lock@main
+```
+
+The action downloads one [gh-actions-lock](https://github.com/github/gh-actions-lock) release for the runner and checks its SHA-256 against the digest written in `action.yml` before running it. It supports Linux and macOS runners, x64 and arm64, with `bash` and `curl`. The release and its digests move with the weekly dependency update.
+
+It reads the locked actions with `github.token`. Pass `token` to use another one.
+
 # Fly Deploy Action
 
 This GitHub Action builds the project's container image, pushes it to the app's registry on Fly.io and deploys it. Run the nix action first: flyctl, skopeo, uv, nix-build, jq and curl must be available on `PATH`.

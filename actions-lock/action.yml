@@ -1,0 +1,73 @@
+name: "Verify actions.lock"
+description:
+  Fail when .github/workflows/actions.lock no longer matches the workflows, or
+  when a locked commit no longer verifies upstream, using a hash-checked
+  gh-actions-lock release
+
+inputs:
+  token:
+    description:
+      Token gh-actions-lock uses to read the locked actions from GitHub.
+    default: ${{ github.token }}
+
+runs:
+  using: "composite"
+  steps:
+
+    - name: Download gh-actions-lock
+      id: download
+      shell: bash
+      env:
+        # The gh-actions-lock release and the SHA-256 GitHub publishes for each
+        # asset; they move together with the nixpkgs-unstable pin.
+        VERSION: v0.4.1
+        SHA256_LINUX_AMD64: 39deb2fe714dbf74b073d8245fc7f3d50cd0eee18d5c0900e9e849ae933ae17e
+        SHA256_LINUX_ARM64: aee61c993da36a5f09be2c77e6e4a1a22542a1b30ded4996bf8301c15dcf2b39
+        SHA256_DARWIN_AMD64: 4ef64599440398999f184321d5237df131721434901ecaaf3da6aa018bdd1f8f
+        SHA256_DARWIN_ARM64: f205ea5dbbda67165e08aab1fb6395290ca62f0a038bf27d4b684abd0816635c
+      run: |
+        set -euo pipefail
+
+        case "$RUNNER_OS/$RUNNER_ARCH" in
+          Linux/X64)   ASSET=linux-amd64;  EXPECTED=$SHA256_LINUX_AMD64 ;;
+          Linux/ARM64) ASSET=linux-arm64;  EXPECTED=$SHA256_LINUX_ARM64 ;;
+          macOS/X64)   ASSET=darwin-amd64; EXPECTED=$SHA256_DARWIN_AMD64 ;;
+          macOS/ARM64) ASSET=darwin-arm64; EXPECTED=$SHA256_DARWIN_ARM64 ;;
+          *)
+            echo "::error::No gh-actions-lock $VERSION digest for $RUNNER_OS/$RUNNER_ARCH. Run this on a Linux or macOS runner, x64 or arm64."
+            exit 1 ;;
+        esac
+
+        DIR="$RUNNER_TEMP/gh-actions-lock-$VERSION"
+        mkdir -p "$DIR"
+        DOWNLOAD="$DIR/$ASSET.download"
+        curl --fail --silent --show-error --location --retry 3 \
+          --output "$DOWNLOAD" \
+          "https://github.com/github/gh-actions-lock/releases/download/$VERSION/$ASSET"
+
+        if command -v sha256sum > /dev/null; then
+          ACTUAL=$(sha256sum "$DOWNLOAD" | cut -d ' ' -f 1)
+        else
+          ACTUAL=$(shasum -a 256 "$DOWNLOAD" | cut -d ' ' -f 1)
+        fi
+        if [ "$ACTUAL" != "$EXPECTED" ]; then
+          rm -f "$DOWNLOAD"
+          echo "::error::gh-actions-lock $VERSION $ASSET has SHA-256 $ACTUAL, but this action expects $EXPECTED. Not running it."
+          exit 1
+        fi
+
+        # Only a download that matched its digest becomes executable.
+        BIN="$DIR/gh-actions-lock"
+        mv "$DOWNLOAD" "$BIN"
+        chmod +x "$BIN"
+        echo "gh-actions-lock $VERSION $ASSET, SHA-256 $ACTUAL"
+        echo "path=$BIN" >> "$GITHUB_OUTPUT"
+
+    - name: Verify actions.lock
+      shell: bash
+      env:
+        GH_ACTIONS_LOCK: ${{ steps.download.outputs.path }}
+        GH_TOKEN: ${{ inputs.token }}
+      run: |
+        set -euo pipefail
+        "$GH_ACTIONS_LOCK" --verify
