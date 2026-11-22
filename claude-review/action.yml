@@ -86,12 +86,8 @@ runs:
         # in review threads, a GitHub MCP server that offers only replies:
         # `gh` has no command for those. Its config is inline because
         # claude-code-action drops a config file when it adds its own servers.
-        # `--permission-mode default` keeps --allowedTools a strict list: in
-        # the action's own default, auto mode, a safety review can pass
-        # commands the list leaves out.
         claude_args: >-
           --model opus
-          --permission-mode default
           --add-dir ${{ runner.temp }}/review-context
           --mcp-config '{"mcpServers": {"github_reply": {"command": "docker",
           "args": ["run", "-i", "--rm", "-e", "GITHUB_PERSONAL_ACCESS_TOKEN",
