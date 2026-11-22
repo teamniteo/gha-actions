@@ -55,7 +55,7 @@ runs:
         fi
 
     - id: claude
-      uses: anthropics/claude-code-action@61a9c274fa7110a66dfafc1bbbced03833eb25fe # v1.0.269
+      uses: anthropics/claude-code-action@f3b070c88125d33dbae5653df5f143101d4ea9dc # v1.0.276
       if: steps.check.outputs.run == 'true'
       env:
         # Keep the OAuth token out of the shell commands Claude runs.
@@ -86,8 +86,12 @@ runs:
         # in review threads, a GitHub MCP server that offers only replies:
         # `gh` has no command for those. Its config is inline because
         # claude-code-action drops a config file when it adds its own servers.
+        # `--permission-mode default` keeps --allowedTools a strict list: in
+        # the action's own default, auto mode, a safety review can pass
+        # commands the list leaves out.
         claude_args: >-
           --model opus
+          --permission-mode default
           --add-dir ${{ runner.temp }}/review-context
           --mcp-config '{"mcpServers": {"github_reply": {"command": "docker",
           "args": ["run", "-i", "--rm", "-e", "GITHUB_PERSONAL_ACCESS_TOKEN",
