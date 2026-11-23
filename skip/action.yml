@@ -47,7 +47,7 @@ runs:
         GH_TOKEN: ${{ github.token }}
       run: python3 "$GITHUB_ACTION_PATH/cache.py" check
 
-    - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
+    - uses: dorny/paths-filter@v4.0.3
       id: paths
       if: steps.config.outputs.always-run != 'true' && steps.config.outputs.filter != '' && github.event_name == 'pull_request' && steps.check.outputs.skip != 'true' && steps.check.outputs.full != 'true'
       with:
