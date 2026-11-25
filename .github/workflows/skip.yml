@@ -27,7 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
 
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 2
           persist-credentials: false
@@ -37,9 +37,9 @@ jobs:
           "$GHA_SKIP_PYTHON" -m unittest discover -s skip -p 'test_*.py'
           "$GHA_SKIP_PYTHON" -m unittest discover -s nix -p 'test_*.py'
       - name: Verify saving without a cache key is harmless
-        uses: ./skip-save
+        uses: $/skip-save
 
-      - uses: ./skip
+      - uses: $/skip
         id: filtered
       - name: Verify the unified decision and reason
         if: github.event_name == 'pull_request'
@@ -64,12 +64,12 @@ jobs:
         shard: [1, 2]
     steps:
 
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 2
           persist-credentials: false
 
-      - uses: ./skip
+      - uses: $/skip
         id: skip
       - name: Produce a downstream artifact
         if: steps.skip.outputs.run
@@ -77,14 +77,14 @@ jobs:
           SHARD: ${{ matrix.shard }}
         run: echo "$SHARD" > "$RUNNER_TEMP/skip-output.txt"
 
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      - uses: actions/upload-artifact@v7.0.2
         if: steps.skip.outputs.run
         with:
           name: output_${{ github.event.pull_request.head.sha || github.sha }}_${{ matrix.shard }}
           path: ${{ runner.temp }}/skip-output.txt
       - name: Restore the original successful output
         if: steps.skip.outputs.skip
-        uses: dawidd6/action-download-artifact@a92c7ae74cf1df8810783758581e485ac3aaa309 # v28
+        uses: dawidd6/action-download-artifact@v28
         with:
           run_id: ${{ steps.skip.outputs.run-id }}
           name: output_${{ steps.skip.outputs.head-sha }}_${{ matrix.shard }}
@@ -95,5 +95,5 @@ jobs:
           SHARD: ${{ matrix.shard }}
         run: test "$(cat "$RUNNER_TEMP/restored/skip-output.txt")" = "$SHARD"
 
-      - uses: ./skip-save
+      - uses: $/skip-save
         if: steps.skip.outputs.run
